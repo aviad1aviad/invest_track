@@ -80,8 +80,8 @@ function AppInner() {
     <div className="app" dir="rtl">
       <aside className="sidebar">
         <div className="sidebar-brand">
-          <span className="brand-icon">💼</span>
-          <span className="brand-name">InvestTrack</span>
+          <span className="brand-icon">📊</span>
+          <span className="brand-name">ניהול כלכלי</span>
         </div>
         <nav className="sidebar-nav">
           {TABS.map(tab => (
