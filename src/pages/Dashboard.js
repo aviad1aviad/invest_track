@@ -16,13 +16,41 @@ function fmt(n) { return Number(n).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 
 function calcInvCurrentValue(inv) {
-  if (inv.entryType === 'provident') {
-    return Number(inv.currentValue) || 0;
-  }
+  if (inv.entryType === 'provident') return Number(inv.currentValue) || 0;
   const units = Number(inv.unitCount) || 0;
   const agorot = Number(inv.unitPriceAgorot) || 0;
   if (!units || !agorot) return 0;
   return (units * agorot) / 100;
+}
+
+const EXPENSE_COLORS = ['#4361ee', '#f7932a', '#3ecf8e', '#e94560', '#f7ae3a', '#a259ff', '#b5b5b5', '#06d6a0', '#8ecae6'];
+
+function SectionTitle({ children }) {
+  return <h2 className="dash-section-title">{children}</h2>;
+}
+
+function PieLegend({ data, total, showProfitCol = false, profitMap = {} }) {
+  return (
+    <div className="dash-legend">
+      {data.map((entry, i) => (
+        <div key={i} className="legend-row">
+          <span className="legend-dot" style={{ background: entry.color }} />
+          <span className="legend-name">{entry.name}</span>
+          <span className="legend-pct">{total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0}%</span>
+          <span className="legend-amount">₪{fmt(entry.value)}</span>
+          {showProfitCol && profitMap[entry.name] !== undefined && (
+            <span className={profitMap[entry.name] >= 0 ? 'legend-profit positive' : 'legend-profit negative'}>
+              {profitMap[entry.name] >= 0 ? '+' : ''}₪{fmt(profitMap[entry.name])}
+            </span>
+          )}
+        </div>
+      ))}
+      <div className="legend-total">
+        <span>סה"כ</span>
+        <span>₪{fmt(total)}</span>
+      </div>
+    </div>
+  );
 }
 
 export default function Dashboard() {
@@ -36,14 +64,14 @@ export default function Dashboard() {
   const totalInvReturn = totalInvDeposits > 0 ? (totalInvProfit / totalInvDeposits) * 100 : 0;
   const grandTotal = totalSavings + totalInvCurrentValue;
 
-  // Combine savings + investments by type for the global pie
+  // Global pie: savings + investments combined by type, sorted high→low
   const typeMap = {};
   state.savings.forEach(s => {
-    typeMap[s.type] = (typeMap[s.type] || 0) + (Number(s.currentAmount) || 0);
+    if (s.type) typeMap[s.type] = (typeMap[s.type] || 0) + (Number(s.currentAmount) || 0);
   });
   state.investments.forEach(inv => {
     const val = calcInvCurrentValue(inv);
-    if (val) typeMap[inv.type] = (typeMap[inv.type] || 0) + val;
+    if (val && inv.type) typeMap[inv.type] = (typeMap[inv.type] || 0) + val;
   });
 
   const globalPieData = Object.entries(typeMap)
@@ -51,24 +79,35 @@ export default function Dashboard() {
     .map(([name, value]) => ({ name, value, color: getColor(name) }))
     .sort((a, b) => b.value - a.value);
 
+  // Savings pie sorted
   const savingsPieData = Array.from(new Set(state.savings.map(s => s.type).filter(Boolean)))
     .map(t => ({
       name: t,
       value: state.savings.filter(s => s.type === t).reduce((sum, s) => sum + (Number(s.currentAmount) || 0), 0),
       color: getColor(t),
     }))
-    .filter(d => d.value > 0);
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value);
 
+  // Investments pie by type, sorted, with profit per type
+  const invTypes = Array.from(new Set(state.investments.map(inv => inv.type).filter(Boolean)));
+  const invPieData = invTypes.map(t => {
+    const group = state.investments.filter(inv => inv.type === t);
+    const val = group.reduce((s, inv) => s + calcInvCurrentValue(inv), 0);
+    const dep = group.reduce((s, inv) => s + (Number(inv.totalDeposits) || 0), 0);
+    return { name: t, value: val, deposits: dep, profit: val - dep, color: getColor(t) };
+  }).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+
+  const invProfitMap = Object.fromEntries(invPieData.map(d => [d.name, d.profit]));
+
+  // Expenses pie sorted
   const expensesByDomain = state.expenses.reduce((acc, e) => {
     acc[e.domain] = (acc[e.domain] || 0) + (Number(e.amount) || 0);
     return acc;
   }, {});
-
   const expensePieData = Object.entries(expensesByDomain)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
-
-  const EXPENSE_COLORS = ['#4361ee', '#f7932a', '#3ecf8e', '#e94560', '#f7ae3a', '#a259ff', '#b5b5b5', '#06d6a0', '#8ecae6'];
 
   return (
     <div className="page">
@@ -78,23 +117,23 @@ export default function Dashboard() {
 
       {/* KPI cards */}
       <div className="kpi-grid">
-        <div className="card kpi-card">
+        <div className="kpi-card kpi-main">
           <div className="kpi-label">סה"כ נכסים</div>
           <div className="kpi-value main">₪{fmt(grandTotal)}</div>
           <div className="kpi-sub">חסכונות + השקעות</div>
         </div>
-        <div className="card kpi-card">
+        <div className="kpi-card">
           <div className="kpi-label">חסכונות</div>
           <div className="kpi-value">₪{fmt(totalSavings)}</div>
           <div className="kpi-sub">{state.savings.length} קרנות</div>
         </div>
-        <div className="card kpi-card">
+        <div className="kpi-card">
           <div className="kpi-label">תיק השקעות</div>
           <div className="kpi-value">₪{fmt(totalInvCurrentValue)}</div>
           <div className="kpi-sub">{state.investments.length} נכסים</div>
         </div>
-        <div className="card kpi-card">
-          <div className="kpi-label">רווח תיק השקעות</div>
+        <div className="kpi-card">
+          <div className="kpi-label">רווח תיק</div>
           <div className={`kpi-value ${totalInvProfit >= 0 ? 'profit' : 'loss'}`}>
             {totalInvProfit >= 0 ? '+' : ''}₪{fmt(totalInvProfit)}
           </div>
@@ -102,134 +141,103 @@ export default function Dashboard() {
             {totalInvReturn >= 0 ? '+' : ''}{fmtDec(totalInvReturn)}% תשואה
           </div>
         </div>
-        <div className="card kpi-card expenses-card">
+        <div className="kpi-card">
           <div className="kpi-label">הוצאות חודשיות</div>
           <div className="kpi-value expenses">₪{fmt(totalExpenses)}</div>
           <div className="kpi-sub">{state.expenses.length} הוצאות קבועות</div>
         </div>
       </div>
 
-      {/* Global asset allocation */}
+      {/* Global allocation */}
       {globalPieData.length > 0 && (
         <div className="card dash-section">
-          <h2 className="dash-section-title">פיזור כלל הנכסים לפי אפיק</h2>
+          <SectionTitle>פיזור כלל הנכסים לפי אפיק</SectionTitle>
           <div className="dash-chart-layout">
-            <ResponsiveContainer width={280} height={250}>
+            <ResponsiveContainer width={260} height={260}>
               <PieChart>
-                <Pie data={globalPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={100}>
+                <Pie data={globalPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={55} outerRadius={110}>
                   {globalPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={v => `₪${fmt(v)}`} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="dash-legend">
-              {globalPieData.map((entry, i) => (
-                <div key={i} className="legend-row">
-                  <span className="legend-dot" style={{ background: entry.color }} />
-                  <span className="legend-name">{entry.name}</span>
-                  <span className="legend-pct">{grandTotal > 0 ? ((entry.value / grandTotal) * 100).toFixed(1) : 0}%</span>
-                  <span className="legend-amount">₪{fmt(entry.value)}</span>
-                </div>
-              ))}
-              <div className="legend-total">
-                <span>סה"כ</span>
-                <span>₪{fmt(grandTotal)}</span>
-              </div>
-            </div>
+            <PieLegend data={globalPieData} total={grandTotal} />
           </div>
         </div>
       )}
 
+      {/* Investments + Savings row */}
       <div className="dash-two-col">
-        {/* Savings breakdown */}
-        {savingsPieData.length > 0 && (
+        {invPieData.length > 0 && (
           <div className="card dash-section">
-            <h2 className="dash-section-title">חסכונות לפי מסלול</h2>
-            <ResponsiveContainer width="100%" height={200}>
-              <PieChart>
-                <Pie data={savingsPieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
-                  {savingsPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
-                </Pie>
-                <Tooltip formatter={v => `₪${fmt(v)}`} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="mini-total">סה"כ: ₪{fmt(totalSavings)}</div>
+            <SectionTitle>תיק השקעות לפי אפיק</SectionTitle>
+            <div className="dash-chart-layout-sm">
+              <ResponsiveContainer width={200} height={200}>
+                <PieChart>
+                  <Pie data={invPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                    innerRadius={45} outerRadius={85}>
+                    {invPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={v => `₪${fmt(v)}`} />
+                </PieChart>
+              </ResponsiveContainer>
+              <PieLegend data={invPieData} total={totalInvCurrentValue} showProfitCol profitMap={invProfitMap} />
+            </div>
+            <div className="section-footer">
+              <span>סה"כ הפקדות: ₪{fmt(totalInvDeposits)}</span>
+              <span className={totalInvProfit >= 0 ? 'positive' : 'negative'}>
+                רווח: {totalInvProfit >= 0 ? '+' : ''}₪{fmt(totalInvProfit)} ({totalInvReturn >= 0 ? '+' : ''}{fmtDec(totalInvReturn)}%)
+              </span>
+            </div>
           </div>
         )}
 
-        {/* Expenses breakdown */}
-        {expensePieData.length > 0 && (
+        {savingsPieData.length > 0 && (
           <div className="card dash-section">
-            <h2 className="dash-section-title">הוצאות לפי תחום</h2>
-            <ResponsiveContainer width="100%" height={200}>
+            <SectionTitle>חסכונות לפי מסלול</SectionTitle>
+            <div className="dash-chart-layout-sm">
+              <ResponsiveContainer width={200} height={200}>
+                <PieChart>
+                  <Pie data={savingsPieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                    innerRadius={45} outerRadius={85}>
+                    {savingsPieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                  </Pie>
+                  <Tooltip formatter={v => `₪${fmt(v)}`} />
+                </PieChart>
+              </ResponsiveContainer>
+              <PieLegend data={savingsPieData} total={totalSavings} />
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Expenses */}
+      {expensePieData.length > 0 && (
+        <div className="card dash-section">
+          <SectionTitle>הוצאות חודשיות לפי תחום</SectionTitle>
+          <div className="dash-chart-layout">
+            <ResponsiveContainer width={220} height={220}>
               <PieChart>
-                <Pie data={expensePieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={75}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`} labelLine={false}>
+                <Pie data={expensePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={45} outerRadius={90}>
                   {expensePieData.map((_, i) => <Cell key={i} fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]} />)}
                 </Pie>
                 <Tooltip formatter={v => `₪${fmt(v)}`} />
               </PieChart>
             </ResponsiveContainer>
-            <div className="mini-total">סה"כ חודשי: ₪{fmt(totalExpenses)}</div>
+            <div className="dash-legend">
+              {expensePieData.map((entry, i) => (
+                <div key={i} className="legend-row">
+                  <span className="legend-dot" style={{ background: EXPENSE_COLORS[i % EXPENSE_COLORS.length] }} />
+                  <span className="legend-name">{entry.name}</span>
+                  <span className="legend-pct">{totalExpenses > 0 ? ((entry.value / totalExpenses) * 100).toFixed(1) : 0}%</span>
+                  <span className="legend-amount">₪{fmt(entry.value)}</span>
+                </div>
+              ))}
+              <div className="legend-total"><span>סה"כ חודשי</span><span>₪{fmt(totalExpenses)}</span></div>
+            </div>
           </div>
-        )}
-      </div>
-
-      {/* Investments table summary */}
-      {state.investments.length > 0 && (
-        <div className="card dash-section">
-          <h2 className="dash-section-title">סיכום תיק השקעות לפי אפיק</h2>
-          <table className="data-table">
-            <thead>
-              <tr>
-                <th>אפיק</th>
-                <th>שווי עדכני</th>
-                <th>הפקדות</th>
-                <th>רווח</th>
-                <th>תשואה</th>
-                <th>אחוז מהתיק</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Array.from(new Set(state.investments.map(inv => inv.type))).map(type => {
-                const group = state.investments.filter(inv => inv.type === type);
-                const val = group.reduce((s, inv) => s + calcInvCurrentValue(inv), 0);
-                const dep = group.reduce((s, inv) => s + (Number(inv.totalDeposits) || 0), 0);
-                const profit = val - dep;
-                const ret = dep > 0 ? (profit / dep) * 100 : null;
-                const portPct = totalInvCurrentValue > 0 ? ((val / totalInvCurrentValue) * 100).toFixed(1) : 0;
-                return (
-                  <tr key={type}>
-                    <td><span className="badge inv-badge">{type}</span></td>
-                    <td className="num">₪{fmt(val)}</td>
-                    <td className="num">₪{fmt(dep)}</td>
-                    <td className={profit >= 0 ? 'positive' : 'negative'}>
-                      {profit >= 0 ? '+' : ''}₪{fmt(profit)}
-                    </td>
-                    <td className={ret >= 0 ? 'positive' : 'negative'}>
-                      {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
-                    </td>
-                    <td className="num">{portPct}%</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-            <tfoot>
-              <tr className="total-row">
-                <td><strong>סה"כ</strong></td>
-                <td className="num"><strong>₪{fmt(totalInvCurrentValue)}</strong></td>
-                <td className="num"><strong>₪{fmt(totalInvDeposits)}</strong></td>
-                <td className={totalInvProfit >= 0 ? 'positive' : 'negative'}>
-                  <strong>{totalInvProfit >= 0 ? '+' : ''}₪{fmt(totalInvProfit)}</strong>
-                </td>
-                <td className={totalInvReturn >= 0 ? 'positive' : 'negative'}>
-                  <strong>{totalInvReturn >= 0 ? '+' : ''}{fmtDec(totalInvReturn)}%</strong>
-                </td>
-                <td className="num"><strong>100%</strong></td>
-              </tr>
-            </tfoot>
-          </table>
         </div>
       )}
 
