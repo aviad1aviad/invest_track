@@ -187,7 +187,7 @@ export default function Investments() {
                         ? <span className="ticker-badge">{inv.securityNumber}</span>
                         : <span className="no-ticker">—</span>}
                     </td>
-                    <td className="num">{inv.unitCount ? fmtDec(Number(inv.unitCount), 4) : '—'}</td>
+                    <td className="num">{inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
                     <td className="num">{inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
                     <td className="num">{currentVal !== null ? `₪${fmt(currentVal)}` : '—'}</td>
                     <td className="num">₪{fmt(inv.totalDeposits)}</td>
@@ -255,19 +255,19 @@ export default function Investments() {
               <Input name="securityNumber" value={form.securityNumber} onChange={handleChange} placeholder="מספר נייר ערך" />
             </FormField>
             <FormField label={'סה"כ הפקדות (₪)'}>
-              <Input name="totalDeposits" type="number" step="any" value={form.totalDeposits} onChange={handleChange} placeholder="0" min="0" required />
+              <Input name="totalDeposits" type="number" step="0.01" value={form.totalDeposits} onChange={handleChange} placeholder="0" min="0" required />
             </FormField>
             <FormField label="כמות יחידות">
-              <Input name="unitCount" type="number" step="any" value={form.unitCount} onChange={handleChange} placeholder="0" />
+              <Input name="unitCount" type="number" step="1" value={form.unitCount} onChange={handleChange} placeholder="0" min="0" />
             </FormField>
             <FormField label="שווי יחידה (אגורות)">
-              <Input name="unitPriceAgorot" type="number" step="any" value={form.unitPriceAgorot} onChange={handleChange} placeholder="לדוגמה: 15000 = ₪150" />
+              <Input name="unitPriceAgorot" type="number" step="0.01" value={form.unitPriceAgorot} onChange={handleChange} placeholder="לדוגמה: 15000 = ₪150" />
               {form.unitPriceAgorot > 0 && (
                 <div className="field-hint">= ₪{fmtDec(Number(form.unitPriceAgorot) / 100, 2)} ליחידה</div>
               )}
             </FormField>
             <FormField label="דמי ניהול צבירה (%)">
-              <Input name="accumulationFee" type="number" step="any" value={form.accumulationFee} onChange={handleChange} placeholder="0.000" />
+              <Input name="accumulationFee" type="number" step="0.01" value={form.accumulationFee} onChange={handleChange} placeholder="0.00" />
             </FormField>
             <FormActions onCancel={closeModal} submitLabel={editing ? 'עדכן' : 'הוסף'} />
           </form>
