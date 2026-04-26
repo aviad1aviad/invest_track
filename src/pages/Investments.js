@@ -14,7 +14,6 @@ const EMPTY_FORM = {
   name: '',
   type: '',
   securityNumber: '',
-  ticker: '',
   investmentHouse: '',
   managingCompany: '',
   totalDeposits: '',
@@ -78,15 +77,15 @@ export default function Investments() {
   };
 
   const handleRefreshPrices = async () => {
-    const withTicker = state.investments.filter(inv => inv.ticker);
-    if (!withTicker.length) {
+    const withNumber = state.investments.filter(inv => inv.securityNumber);
+    if (!withNumber.length) {
       setRefreshResults({ updated: [], failed: [], noTicker: state.investments.length });
       return;
     }
     setRefreshing(true);
     setRefreshResults(null);
     try {
-      const results = await fetchPrices(withTicker);
+      const results = await fetchPrices(withNumber);
       const updated = [];
       const failed = [];
       results.forEach(r => {
@@ -117,7 +116,7 @@ export default function Investments() {
     color: COLORS[i % COLORS.length],
   })).filter(d => d.value > 0);
 
-  const tickerCount = state.investments.filter(inv => inv.ticker).length;
+  const tickerCount = state.investments.filter(inv => inv.securityNumber).length;
 
   return (
     <div className="page">
@@ -215,7 +214,7 @@ export default function Investments() {
                 <th>שם</th>
                 <th>סוג</th>
                 <th>בית השקעות</th>
-                <th>טיקר</th>
+                <th>מס' נייר</th>
                 <th>כמות יחידות</th>
                 <th>שווי יחידה</th>
                 <th>שווי עדכני</th>
@@ -239,8 +238,8 @@ export default function Investments() {
                     <td><span className="badge inv-badge">{inv.type}</span></td>
                     <td>{inv.investmentHouse || '—'}</td>
                     <td>
-                      {inv.ticker
-                        ? <span className="ticker-badge">{inv.ticker}</span>
+                      {inv.securityNumber
+                        ? <span className="ticker-badge">{inv.securityNumber}</span>
                         : <span className="no-ticker">—</span>}
                     </td>
                     <td className="num">{inv.unitCount ? fmtDec(inv.unitCount, 4) : '—'}</td>
@@ -309,10 +308,7 @@ export default function Investments() {
             </FormField>
             <FormField label="מספר נייר">
               <Input name="securityNumber" value={form.securityNumber} onChange={handleChange} placeholder="מספר נייר ערך" />
-            </FormField>
-            <FormField label="טיקר Yahoo Finance">
-              <Input name="ticker" value={form.ticker} onChange={handleChange} placeholder="5122510.TA · BTC-USD · VWRL.L" />
-              <div className="field-hint">לניירות ת"א: מספר נייר + .TA · לביטקוין: BTC-USD</div>
+              <div className="field-hint">משמש לעדכון אוטומטי של מחיר מבורסת ת"א</div>
             </FormField>
             <FormField label={'סה"כ הפקדות (₪)'}>
               <Input name="totalDeposits" type="number" value={form.totalDeposits} onChange={handleChange} placeholder="0" min="0" required />
