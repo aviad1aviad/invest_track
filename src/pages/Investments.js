@@ -10,14 +10,18 @@ const SUGGESTED_TYPES = ['מדד עולמי', 'מסלול מניות סחיר', 
 const COLORS = ['#4361ee', '#f7932a', '#b5b5b5', '#3ecf8e', '#f7ae3a', '#e94560', '#a259ff'];
 
 const EMPTY_FORM = {
+  entryType: 'security',
   name: '',
   type: '',
   securityNumber: '',
   investmentHouse: '',
   managingCompany: '',
   totalDeposits: '',
+  // security fields
   unitCount: '',
   unitPriceAgorot: '',
+  // provident fund fields
+  currentValue: '',
   accumulationFee: '',
 };
 
@@ -25,8 +29,11 @@ function fmt(n) { return Number(n).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function pct(n) { return n !== '' && n !== undefined && n !== 0 ? `${Number(n).toFixed(3)}%` : '—'; }
 
-// TASE prices are in agorot — divide by 100 for shekel value
 function calcCurrentValue(inv) {
+  if (inv.entryType === 'provident') {
+    const val = Number(inv.currentValue) || 0;
+    return val > 0 ? val : null;
+  }
   const units = Number(inv.unitCount) || 0;
   const agorot = Number(inv.unitPriceAgorot) || 0;
   if (!units || !agorot) return null;
@@ -53,7 +60,7 @@ export default function Investments() {
   const [form, setForm] = useState(EMPTY_FORM);
 
   const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
-  const openEdit = inv => { setEditing(inv); setForm({ ...inv }); setShowModal(true); };
+  const openEdit = inv => { setEditing(inv); setForm({ entryType: inv.entryType || 'security', ...inv }); setShowModal(true); };
   const closeModal = () => setShowModal(false);
   const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
@@ -62,9 +69,11 @@ export default function Investments() {
     const payload = {
       ...form,
       totalDeposits: Number(form.totalDeposits),
-      unitCount: Number(form.unitCount),
-      unitPriceAgorot: Number(form.unitPriceAgorot),
       accumulationFee: Number(form.accumulationFee),
+      ...(form.entryType === 'security'
+        ? { unitCount: Number(form.unitCount), unitPriceAgorot: Number(form.unitPriceAgorot), currentValue: 0 }
+        : { currentValue: Number(form.currentValue), unitCount: 0, unitPriceAgorot: 0 }
+      ),
     };
     if (editing) {
       dispatch({ type: 'UPDATE_INVESTMENT', payload: { ...payload, id: editing.id } });
@@ -92,6 +101,8 @@ export default function Investments() {
     value: state.investments.filter(inv => inv.type === t).reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0),
     color: COLORS[i % COLORS.length],
   })).filter(d => d.value > 0);
+
+  const isSecurity = form.entryType === 'security';
 
   return (
     <div className="page">
@@ -171,6 +182,7 @@ export default function Investments() {
             </thead>
             <tbody>
               {state.investments.map(inv => {
+                const isProvident = inv.entryType === 'provident';
                 const currentVal = calcCurrentValue(inv);
                 const profit = calcProfit(inv);
                 const ret = calcReturn(inv);
@@ -179,7 +191,10 @@ export default function Investments() {
                   : null;
                 return (
                   <tr key={inv.id}>
-                    <td><strong>{inv.name}</strong></td>
+                    <td>
+                      <strong>{inv.name}</strong>
+                      {isProvident && <span className="provident-tag">קופ"ג</span>}
+                    </td>
                     <td><span className="badge inv-badge">{inv.type}</span></td>
                     <td>{inv.investmentHouse || '—'}</td>
                     <td>
@@ -187,8 +202,8 @@ export default function Investments() {
                         ? <span className="ticker-badge">{inv.securityNumber}</span>
                         : <span className="no-ticker">—</span>}
                     </td>
-                    <td className="num">{inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
-                    <td className="num">{inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
+                    <td className="num">{!isProvident && inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
+                    <td className="num">{!isProvident && inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
                     <td className="num">{currentVal !== null ? `₪${fmt(currentVal)}` : '—'}</td>
                     <td className="num">₪{fmt(inv.totalDeposits)}</td>
                     <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>
@@ -236,39 +251,79 @@ export default function Investments() {
       {showModal && (
         <Modal title={editing ? 'עריכת השקעה' : 'השקעה חדשה'} onClose={closeModal}>
           <form onSubmit={handleSubmit}>
+
+            {/* Entry type toggle */}
+            <div className="entry-type-toggle">
+              <button
+                type="button"
+                className={`toggle-btn ${isSecurity ? 'active' : ''}`}
+                onClick={() => setForm(f => ({ ...f, entryType: 'security' }))}
+              >
+                נייר ערך
+              </button>
+              <button
+                type="button"
+                className={`toggle-btn ${!isSecurity ? 'active' : ''}`}
+                onClick={() => setForm(f => ({ ...f, entryType: 'provident' }))}
+              >
+                קופת גמל להשקעה
+              </button>
+            </div>
+
             <FormField label="שם">
-              <Input name="name" value={form.name} onChange={handleChange} placeholder="שם קרן / נייר ערך" required />
+              <Input name="name" value={form.name} onChange={handleChange}
+                placeholder={isSecurity ? 'שם קרן / נייר ערך' : 'שם קופת הגמל'} required />
             </FormField>
             <FormField label="סוג השקעה">
-              <Input name="type" value={form.type} onChange={handleChange} placeholder="מדד עולמי, ביטקוין..." list="inv-types-list" />
+              <Input name="type" value={form.type} onChange={handleChange}
+                placeholder="מדד עולמי, ביטקוין..." list="inv-types-list" />
               <datalist id="inv-types-list">
                 {SUGGESTED_TYPES.map(t => <option key={t} value={t} />)}
               </datalist>
             </FormField>
-            <FormField label="בית השקעות">
-              <Input name="investmentHouse" value={form.investmentHouse} onChange={handleChange} placeholder="מיטב, אינבסקו, הראל..." />
+            <FormField label="בית השקעות / חברה מנהלת">
+              <Input name="investmentHouse" value={form.investmentHouse} onChange={handleChange}
+                placeholder="מור, מיטב, הראל..." />
             </FormField>
-            <FormField label="חברה מנהלת">
-              <Input name="managingCompany" value={form.managingCompany} onChange={handleChange} placeholder="חברה מנהלת" />
-            </FormField>
-            <FormField label="מספר נייר">
-              <Input name="securityNumber" value={form.securityNumber} onChange={handleChange} placeholder="מספר נייר ערך" />
-            </FormField>
+
+            {isSecurity && (
+              <FormField label="מספר נייר">
+                <Input name="securityNumber" value={form.securityNumber} onChange={handleChange}
+                  placeholder="מספר נייר ערך" />
+              </FormField>
+            )}
+
             <FormField label={'סה"כ הפקדות (₪)'}>
-              <Input name="totalDeposits" type="number" step="0.01" value={form.totalDeposits} onChange={handleChange} placeholder="0" min="0" required />
+              <Input name="totalDeposits" type="number" step="0.01" value={form.totalDeposits}
+                onChange={handleChange} placeholder="0" min="0" required />
             </FormField>
-            <FormField label="כמות יחידות">
-              <Input name="unitCount" type="number" step="1" value={form.unitCount} onChange={handleChange} placeholder="0" min="0" />
+
+            {isSecurity ? (
+              <>
+                <FormField label="כמות יחידות">
+                  <Input name="unitCount" type="number" step="1" value={form.unitCount}
+                    onChange={handleChange} placeholder="0" min="0" />
+                </FormField>
+                <FormField label="שווי יחידה (אגורות)">
+                  <Input name="unitPriceAgorot" type="number" step="0.01" value={form.unitPriceAgorot}
+                    onChange={handleChange} placeholder="לדוגמה: 15000 = ₪150" />
+                  {form.unitPriceAgorot > 0 && (
+                    <div className="field-hint">= ₪{fmtDec(Number(form.unitPriceAgorot) / 100, 2)} ליחידה</div>
+                  )}
+                </FormField>
+              </>
+            ) : (
+              <FormField label="שווי עדכני של הקופה (₪)">
+                <Input name="currentValue" type="number" step="0.01" value={form.currentValue}
+                  onChange={handleChange} placeholder="0" min="0" />
+              </FormField>
+            )}
+
+            <FormField label="דמי ניהול (%)">
+              <Input name="accumulationFee" type="number" step="0.01" value={form.accumulationFee}
+                onChange={handleChange} placeholder="0.00" />
             </FormField>
-            <FormField label="שווי יחידה (אגורות)">
-              <Input name="unitPriceAgorot" type="number" step="0.01" value={form.unitPriceAgorot} onChange={handleChange} placeholder="לדוגמה: 15000 = ₪150" />
-              {form.unitPriceAgorot > 0 && (
-                <div className="field-hint">= ₪{fmtDec(Number(form.unitPriceAgorot) / 100, 2)} ליחידה</div>
-              )}
-            </FormField>
-            <FormField label="דמי ניהול צבירה (%)">
-              <Input name="accumulationFee" type="number" step="0.01" value={form.accumulationFee} onChange={handleChange} placeholder="0.00" />
-            </FormField>
+
             <FormActions onCancel={closeModal} submitLabel={editing ? 'עדכן' : 'הוסף'} />
           </form>
         </Modal>

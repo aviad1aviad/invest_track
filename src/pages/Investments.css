@@ -120,6 +120,45 @@
   margin-top: 4px;
 }
 
+.entry-type-toggle {
+  display: flex;
+  gap: 0;
+  margin-bottom: 20px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1.5px solid #4361ee;
+}
+
+.toggle-btn {
+  flex: 1;
+  padding: 9px 0;
+  border: none;
+  background: #fff;
+  color: #4361ee;
+  font-size: 0.92rem;
+  font-weight: 600;
+  cursor: pointer;
+  font-family: inherit;
+  transition: all 0.15s;
+}
+
+.toggle-btn.active {
+  background: #4361ee;
+  color: #fff;
+}
+
+.provident-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  background: #e8f5e9;
+  color: #2e7d32;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
 tfoot .total-row td {
   padding: 12px 14px;
   border-top: 2px solid #e0e4f0;

@@ -16,9 +16,13 @@ function fmt(n) { return Number(n).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 
 function calcInvCurrentValue(inv) {
+  if (inv.entryType === 'provident') {
+    return Number(inv.currentValue) || 0;
+  }
   const units = Number(inv.unitCount) || 0;
-  const price = Number(inv.unitPrice) || 0;
-  return units && price ? units * price : 0;
+  const agorot = Number(inv.unitPriceAgorot) || 0;
+  if (!units || !agorot) return 0;
+  return (units * agorot) / 100;
 }
 
 export default function Dashboard() {
