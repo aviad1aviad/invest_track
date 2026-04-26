@@ -1,14 +1,17 @@
 import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
-import { FormField, Input, Select, FormActions } from '../components/common/FormField';
+import { FormField, Input, FormActions } from '../components/common/FormField';
 import './Page.css';
 import './Expenses.css';
 
-const DOMAINS = ['דיור', 'בית', 'בריאות', 'חינוך', 'חוגים', 'תחבורה', 'תקשורת', 'שונות', 'תיק השקעות'];
-const PAYMENT_METHODS = ['כרטיס אשראי', 'הוראת קבע', 'מזומן'];
+const DOMAINS = ['דיור', 'בית', 'אוכל', 'בריאות', 'חינוך', 'חוגים', 'תחבורה', 'תקשורת', 'שונות', 'תיק השקעות'];
+const PAYMENT_METHODS = ["צ'ק", 'כרטיס אשראי', 'הוראת קבע', 'העברה בנקאית'];
 
-const EMPTY_FORM = { domain: 'דיור', name: '', amount: '', paymentMethod: 'כרטיס אשראי', paymentEntity: '' };
+const FOOD_DOMAIN = 'אוכל';
+const SAVINGS_DOMAIN = 'תיק השקעות';
+
+const EMPTY_FORM = { domain: 'דיור', name: '', amount: '', paymentMethod: '', paymentEntity: '' };
 
 function fmt(n) {
   return Number(n).toLocaleString('he-IL');
@@ -41,13 +44,23 @@ export default function Expenses() {
     if (window.confirm('למחוק הוצאה זו?')) dispatch({ type: 'DELETE_EXPENSE', payload: id });
   };
 
-  const byDomain = DOMAINS.reduce((acc, d) => {
+  // Group by domain — known ones first, then any custom domains
+  const allDomains = [
+    ...DOMAINS,
+    ...state.expenses.map(e => e.domain).filter(d => d && !DOMAINS.includes(d)),
+  ].filter((d, i, arr) => arr.indexOf(d) === i);
+
+  const byDomain = allDomains.reduce((acc, d) => {
     acc[d] = state.expenses.filter(e => e.domain === d);
     return acc;
   }, {});
 
-  const domainTotal = (d) => byDomain[d].reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const domainTotal = d => (byDomain[d] || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
+
   const grandTotal = state.expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const foodTotal = domainTotal(FOOD_DOMAIN);
+  const savingsTotal = domainTotal(SAVINGS_DOMAIN);
+  const baseTotal = grandTotal - foodTotal - savingsTotal;
 
   return (
     <div className="page">
@@ -56,13 +69,34 @@ export default function Expenses() {
         <button className="btn btn-primary" onClick={openAdd}>+ הוצאה חדשה</button>
       </div>
 
+      {/* Mini-dashboard */}
+      {state.expenses.length > 0 && (
+        <div className="exp-kpi-row">
+          <div className="exp-kpi-card">
+            <div className="exp-kpi-label">ללא אוכל וחיסכון</div>
+            <div className="exp-kpi-value">₪{fmt(baseTotal)}</div>
+            <div className="exp-kpi-sub">הוצאות בסיס</div>
+          </div>
+          <div className="exp-kpi-card food">
+            <div className="exp-kpi-label">+ אוכל</div>
+            <div className="exp-kpi-value">₪{fmt(baseTotal + foodTotal)}</div>
+            <div className="exp-kpi-sub">בסיס + אוכל</div>
+          </div>
+          <div className="exp-kpi-card savings">
+            <div className="exp-kpi-label">+ חיסכון</div>
+            <div className="exp-kpi-value">₪{fmt(grandTotal)}</div>
+            <div className="exp-kpi-sub">סה"כ כולל הכל</div>
+          </div>
+        </div>
+      )}
+
       <div className="summary-bar">
         <div className="summary-total">
           <span className="summary-label">סה"כ חודשי</span>
           <span className="summary-value">₪{fmt(grandTotal)}</span>
         </div>
         <div className="domain-pills">
-          {DOMAINS.filter(d => byDomain[d].length > 0).map(d => (
+          {allDomains.filter(d => (byDomain[d] || []).length > 0).map(d => (
             <div key={d} className="domain-pill">
               <span className="pill-domain">{d}</span>
               <span className="pill-amount">₪{fmt(domainTotal(d))}</span>
@@ -71,8 +105,8 @@ export default function Expenses() {
         </div>
       </div>
 
-      {DOMAINS.map(domain => {
-        const rows = byDomain[domain];
+      {allDomains.map(domain => {
+        const rows = byDomain[domain] || [];
         if (!rows.length) return null;
         return (
           <div key={domain} className="domain-section">
@@ -120,9 +154,11 @@ export default function Expenses() {
         <Modal title={editing ? 'עריכת הוצאה' : 'הוצאה חדשה'} onClose={closeModal}>
           <form onSubmit={handleSubmit}>
             <FormField label="תחום">
-              <Select name="domain" value={form.domain} onChange={handleChange} required>
-                {DOMAINS.map(d => <option key={d} value={d}>{d}</option>)}
-              </Select>
+              <Input name="domain" value={form.domain} onChange={handleChange}
+                placeholder="דיור, אוכל, תחבורה..." list="domains-list" required />
+              <datalist id="domains-list">
+                {DOMAINS.map(d => <option key={d} value={d} />)}
+              </datalist>
             </FormField>
             <FormField label="שם הוצאה">
               <Input name="name" value={form.name} onChange={handleChange} placeholder="שם הוצאה" required />
@@ -131,9 +167,11 @@ export default function Expenses() {
               <Input name="amount" type="number" value={form.amount} onChange={handleChange} placeholder="0" min="0" required />
             </FormField>
             <FormField label="אמצעי תשלום">
-              <Select name="paymentMethod" value={form.paymentMethod} onChange={handleChange}>
-                {PAYMENT_METHODS.map(m => <option key={m} value={m}>{m}</option>)}
-              </Select>
+              <Input name="paymentMethod" value={form.paymentMethod} onChange={handleChange}
+                placeholder="כרטיס אשראי, הוראת קבע..." list="payment-methods-list" />
+              <datalist id="payment-methods-list">
+                {PAYMENT_METHODS.map(m => <option key={m} value={m} />)}
+              </datalist>
             </FormField>
             <FormField label="גורם (בנק / חברת אשראי)">
               <Input name="paymentEntity" value={form.paymentEntity} onChange={handleChange} placeholder="לדוגמה: ויזה, הפועלים" />

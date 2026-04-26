@@ -100,7 +100,9 @@ export default function Investments() {
     name: t,
     value: state.investments.filter(inv => inv.type === t).reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0),
     color: COLORS[i % COLORS.length],
-  })).filter(d => d.value > 0);
+  })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+
+  const sortedInvestments = [...state.investments].sort((a, b) => (calcCurrentValue(b) ?? 0) - (calcCurrentValue(a) ?? 0));
 
   const isSecurity = form.entryType === 'security';
 
@@ -140,7 +142,8 @@ export default function Investments() {
           <div className="inv-chart-layout">
             <ResponsiveContainer width={260} height={220}>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={90}>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={90}>
                   {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={v => `₪${fmt(v)}`} />
@@ -181,7 +184,7 @@ export default function Investments() {
               </tr>
             </thead>
             <tbody>
-              {state.investments.map(inv => {
+              {sortedInvestments.map(inv => {
                 const isProvident = inv.entryType === 'provident';
                 const currentVal = calcCurrentValue(inv);
                 const profit = calcProfit(inv);

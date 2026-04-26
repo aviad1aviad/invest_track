@@ -65,13 +65,15 @@ export default function Savings() {
 
   const total = state.savings.reduce((s, sv) => s + (Number(sv.currentAmount) || 0), 0);
 
-  // Dynamic types from actual data
+  // Dynamic types from actual data, sorted high→low
   const allTypes = [...new Set(state.savings.map(s => s.type).filter(Boolean))];
   const pieData = allTypes.map((t, i) => ({
     name: t,
     value: state.savings.filter(s => s.type === t).reduce((sum, s) => sum + (Number(s.currentAmount) || 0), 0),
     color: COLORS[i % COLORS.length],
-  })).filter(d => d.value > 0);
+  })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
+
+  const sortedSavings = [...state.savings].sort((a, b) => (Number(b.currentAmount) || 0) - (Number(a.currentAmount) || 0));
 
   return (
     <div className="page">
@@ -103,8 +105,8 @@ export default function Savings() {
           <div className="card savings-chart-card">
             <ResponsiveContainer width="100%" height={220}>
               <PieChart>
-                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={80}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}>
+                <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={50} outerRadius={90}>
                   {pieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
                 </Pie>
                 <Tooltip formatter={v => `₪${fmt(v)}`} />
@@ -133,7 +135,7 @@ export default function Savings() {
             </tr>
           </thead>
           <tbody>
-            {state.savings.map(s => {
+            {sortedSavings.map(s => {
               const ret = calcReturn(s);
               const profit = (Number(s.currentAmount) || 0) - (Number(s.totalDeposits) || 0);
               return (
