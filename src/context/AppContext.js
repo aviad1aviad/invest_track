@@ -6,12 +6,13 @@ const INITIAL_STATE = {
   expenses: [],
   savings: [],
   investments: [],
+  incomes: [],
 };
 
 function reducer(state, action) {
   switch (action.type) {
     case 'LOAD':
-      return action.payload;
+      return { ...INITIAL_STATE, ...action.payload };
 
     case 'ADD_EXPENSE':
       return { ...state, expenses: [...state.expenses, { ...action.payload, id: Date.now() }] };
@@ -33,6 +34,13 @@ function reducer(state, action) {
       return { ...state, investments: state.investments.map(i => i.id === action.payload.id ? action.payload : i) };
     case 'DELETE_INVESTMENT':
       return { ...state, investments: state.investments.filter(i => i.id !== action.payload) };
+
+    case 'ADD_INCOME':
+      return { ...state, incomes: [...state.incomes, { ...action.payload, id: Date.now() }] };
+    case 'UPDATE_INCOME':
+      return { ...state, incomes: state.incomes.map(i => i.id === action.payload.id ? action.payload : i) };
+    case 'DELETE_INCOME':
+      return { ...state, incomes: state.incomes.filter(i => i.id !== action.payload) };
 
     default:
       return state;

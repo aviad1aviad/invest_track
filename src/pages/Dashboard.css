@@ -1,12 +1,12 @@
 .kpi-grid {
   display: grid;
-  grid-template-columns: repeat(5, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 14px;
   margin-bottom: 20px;
 }
 
-@media (max-width: 1100px) { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
-@media (max-width: 700px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 900px)  { .kpi-grid { grid-template-columns: repeat(3, 1fr); } }
+@media (max-width: 600px)  { .kpi-grid { grid-template-columns: repeat(2, 1fr); } }
 
 .kpi-card {
   background: #fff;
@@ -43,10 +43,13 @@
   color: #1a1a2e;
 }
 
-.kpi-value.main  { font-size: 1.55rem; color: #4361ee; }
-.kpi-value.profit { color: #1a7a4a; }
-.kpi-value.loss   { color: #c0392b; }
+.kpi-value.main    { font-size: 1.55rem; color: #4361ee; }
+.kpi-value.profit  { color: #1a7a4a; }
+.kpi-value.loss    { color: #c0392b; }
 .kpi-value.expenses { color: #e94560; }
+.kpi-value.income  { color: #1a7a4a; }
+
+.kpi-balance { border-top-color: #1a7a4a; background: linear-gradient(135deg, #f0faf5 0%, #fff 60%); }
 
 .kpi-sub {
   font-size: 0.78rem;

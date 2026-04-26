@@ -57,6 +57,8 @@ export default function Dashboard() {
   const { state } = useApp();
 
   const totalExpenses = state.expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const totalIncomes = (state.incomes || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+  const balance = totalIncomes - totalExpenses;
   const totalSavings = state.savings.reduce((s, sv) => s + (Number(sv.currentAmount) || 0), 0);
   const totalInvCurrentValue = state.investments.reduce((s, inv) => s + calcInvCurrentValue(inv), 0);
   const totalInvDeposits = state.investments.reduce((s, inv) => s + (Number(inv.totalDeposits) || 0), 0);
@@ -142,9 +144,21 @@ export default function Dashboard() {
           </div>
         </div>
         <div className="kpi-card">
+          <div className="kpi-label">הכנסות חודשיות</div>
+          <div className="kpi-value income">₪{fmt(totalIncomes)}</div>
+          <div className="kpi-sub">{(state.incomes || []).length} הכנסות</div>
+        </div>
+        <div className="kpi-card">
           <div className="kpi-label">הוצאות חודשיות</div>
           <div className="kpi-value expenses">₪{fmt(totalExpenses)}</div>
           <div className="kpi-sub">{state.expenses.length} הוצאות קבועות</div>
+        </div>
+        <div className="kpi-card kpi-balance">
+          <div className="kpi-label">מאזן חודשי</div>
+          <div className={`kpi-value ${balance >= 0 ? 'profit' : 'loss'}`}>
+            {balance >= 0 ? '+' : ''}₪{fmt(balance)}
+          </div>
+          <div className="kpi-sub">הכנסות פחות הוצאות</div>
         </div>
       </div>
 

@@ -1,0 +1,79 @@
+.income-summary-bar {
+  background: #fff;
+  border-radius: 12px;
+  padding: 18px 22px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.07);
+  margin-bottom: 24px;
+  display: flex;
+  align-items: flex-start;
+  gap: 24px;
+  flex-wrap: wrap;
+}
+
+.income-summary-total {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 150px;
+}
+
+.income-summary-label {
+  font-size: 0.8rem;
+  color: #888;
+  font-weight: 500;
+}
+
+.income-summary-value {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #1a7a4a;
+}
+
+.income-domain-pills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.income-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: #edfaf3;
+  border-radius: 20px;
+  padding: 5px 12px;
+  font-size: 0.82rem;
+}
+
+.income-pill-domain { color: #555; }
+.income-pill-amount { font-weight: 700; color: #1a7a4a; }
+
+.income-domain-section {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  margin-bottom: 18px;
+  overflow: hidden;
+}
+
+.income-domain-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 13px 18px;
+  background: #f0faf5;
+  border-bottom: 1px solid #d4eddf;
+}
+
+.income-domain-name {
+  font-weight: 700;
+  color: #1a1a2e;
+  font-size: 0.95rem;
+}
+
+.income-domain-total {
+  font-weight: 700;
+  color: #1a7a4a;
+  font-size: 0.95rem;
+}

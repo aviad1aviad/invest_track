@@ -4,10 +4,12 @@ import Dashboard from './pages/Dashboard';
 import Expenses from './pages/Expenses';
 import Savings from './pages/Savings';
 import Investments from './pages/Investments';
+import Incomes from './pages/Incomes';
 import './App.css';
 
 const TABS = [
   { id: 'dashboard', label: 'דשבורד', icon: '📊' },
+  { id: 'incomes', label: 'הכנסות', icon: '💰' },
   { id: 'expenses', label: 'הוצאות', icon: '💳' },
   { id: 'savings', label: 'חסכונות', icon: '🏦' },
   { id: 'investments', label: 'השקעות', icon: '📈' },
@@ -69,6 +71,7 @@ function AppInner() {
   const renderPage = () => {
     switch (activeTab) {
       case 'dashboard': return <Dashboard />;
+      case 'incomes': return <Incomes />;
       case 'expenses': return <Expenses />;
       case 'savings': return <Savings />;
       case 'investments': return <Investments />;
