@@ -3,7 +3,6 @@ import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
-import { fetchPrices } from '../utils/priceService';
 import './Page.css';
 import './Investments.css';
 
@@ -18,28 +17,33 @@ const EMPTY_FORM = {
   managingCompany: '',
   totalDeposits: '',
   unitCount: '',
-  unitPrice: '',
+  unitPriceAgorot: '',
   accumulationFee: '',
 };
 
 function fmt(n) { return Number(n).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function pct(n) { return n !== '' && n !== undefined ? `${Number(n).toFixed(2)}%` : '—'; }
+function pct(n) { return n !== '' && n !== undefined && n !== 0 ? `${Number(n).toFixed(3)}%` : '—'; }
 
+// TASE prices are in agorot — divide by 100 for shekel value
 function calcCurrentValue(inv) {
   const units = Number(inv.unitCount) || 0;
-  const price = Number(inv.unitPrice) || 0;
-  return units && price ? units * price : 0;
+  const agorot = Number(inv.unitPriceAgorot) || 0;
+  if (!units || !agorot) return null;
+  return (units * agorot) / 100;
 }
 
 function calcProfit(inv) {
-  return calcCurrentValue(inv) - (Number(inv.totalDeposits) || 0);
+  const val = calcCurrentValue(inv);
+  if (val === null) return null;
+  return val - (Number(inv.totalDeposits) || 0);
 }
 
 function calcReturn(inv) {
   const deposits = Number(inv.totalDeposits) || 0;
-  if (!deposits) return null;
-  return (calcProfit(inv) / deposits) * 100;
+  const profit = calcProfit(inv);
+  if (!deposits || profit === null) return null;
+  return (profit / deposits) * 100;
 }
 
 export default function Investments() {
@@ -47,8 +51,6 @@ export default function Investments() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
-  const [refreshing, setRefreshing] = useState(false);
-  const [refreshResults, setRefreshResults] = useState(null);
 
   const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = inv => { setEditing(inv); setForm({ ...inv }); setShowModal(true); };
@@ -61,7 +63,7 @@ export default function Investments() {
       ...form,
       totalDeposits: Number(form.totalDeposits),
       unitCount: Number(form.unitCount),
-      unitPrice: Number(form.unitPrice),
+      unitPriceAgorot: Number(form.unitPriceAgorot),
       accumulationFee: Number(form.accumulationFee),
     };
     if (editing) {
@@ -76,86 +78,27 @@ export default function Investments() {
     if (window.confirm('למחוק השקעה זו?')) dispatch({ type: 'DELETE_INVESTMENT', payload: id });
   };
 
-  const handleRefreshPrices = async () => {
-    const withNumber = state.investments.filter(inv => inv.securityNumber);
-    if (!withNumber.length) {
-      setRefreshResults({ updated: [], failed: [], noTicker: state.investments.length });
-      return;
-    }
-    setRefreshing(true);
-    setRefreshResults(null);
-    try {
-      const results = await fetchPrices(withNumber);
-      const updated = [];
-      const failed = [];
-      results.forEach(r => {
-        if (r.skipped) return;
-        if (r.error) {
-          failed.push({ name: state.investments.find(i => i.id === r.id)?.name, ticker: r.ticker, error: r.error });
-        } else {
-          const inv = state.investments.find(i => i.id === r.id);
-          dispatch({ type: 'UPDATE_INVESTMENT', payload: { ...inv, unitPrice: r.price } });
-          updated.push({ name: inv.name, ticker: r.ticker, price: r.price, currency: r.currency });
-        }
-      });
-      setRefreshResults({ updated, failed });
-    } finally {
-      setRefreshing(false);
-    }
-  };
-
-  const totalCurrentValue = state.investments.reduce((s, inv) => s + calcCurrentValue(inv), 0);
+  const totalCurrentValue = state.investments.reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0);
   const totalDeposits = state.investments.reduce((s, inv) => s + (Number(inv.totalDeposits) || 0), 0);
-  const totalProfit = totalCurrentValue - totalDeposits;
-  const totalReturn = totalDeposits > 0 ? (totalProfit / totalDeposits) * 100 : 0;
+  const valuedDeposits = state.investments
+    .filter(inv => calcCurrentValue(inv) !== null)
+    .reduce((s, inv) => s + (Number(inv.totalDeposits) || 0), 0);
+  const totalProfit = totalCurrentValue - valuedDeposits;
+  const totalReturn = valuedDeposits > 0 ? (totalProfit / valuedDeposits) * 100 : null;
 
   const allTypes = [...new Set(state.investments.map(inv => inv.type).filter(Boolean))];
   const pieData = allTypes.map((t, i) => ({
     name: t,
-    value: state.investments.filter(inv => inv.type === t).reduce((s, inv) => s + calcCurrentValue(inv), 0),
+    value: state.investments.filter(inv => inv.type === t).reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0),
     color: COLORS[i % COLORS.length],
   })).filter(d => d.value > 0);
-
-  const tickerCount = state.investments.filter(inv => inv.securityNumber).length;
 
   return (
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">השקעות</h1>
-        <div className="page-header-actions">
-          {state.investments.length > 0 && (
-            <button
-              className={`btn btn-refresh ${refreshing ? 'loading' : ''}`}
-              onClick={handleRefreshPrices}
-              disabled={refreshing}
-              title={tickerCount === 0 ? 'אין ניירות עם טיקר מוגדר' : `רענן מחירים עבור ${tickerCount} ניירות`}
-            >
-              {refreshing ? '⏳ מושך מחירים...' : `🔄 רענן מחירים${tickerCount > 0 ? ` (${tickerCount})` : ''}`}
-            </button>
-          )}
-          <button className="btn btn-primary" onClick={openAdd}>+ השקעה חדשה</button>
-        </div>
+        <button className="btn btn-primary" onClick={openAdd}>+ השקעה חדשה</button>
       </div>
-
-      {refreshResults && (
-        <div className={`refresh-banner ${refreshResults.failed?.length ? 'has-errors' : 'success'}`}>
-          {refreshResults.updated?.length > 0 && (
-            <span className="refresh-ok">
-              ✓ עודכנו {refreshResults.updated.length} ניירות:&nbsp;
-              {refreshResults.updated.map(r => `${r.name} (${r.currency} ${fmtDec(r.price)})`).join(' · ')}
-            </span>
-          )}
-          {refreshResults.failed?.length > 0 && (
-            <span className="refresh-err">
-              &nbsp;· ✗ נכשלו: {refreshResults.failed.map(r => `${r.name} [${r.ticker}] — ${r.error}`).join(', ')}
-            </span>
-          )}
-          {refreshResults.updated?.length === 0 && !refreshResults.failed?.length && (
-            <span>אין ניירות עם טיקר מוגדר — הוסף טיקר בעריכת ההשקעה</span>
-          )}
-          <button className="refresh-close" onClick={() => setRefreshResults(null)}>✕</button>
-        </div>
-      )}
 
       <div className="inv-overview">
         <div className="card stat-card">
@@ -169,13 +112,13 @@ export default function Investments() {
         <div className="card stat-card">
           <div className="summary-label">רווח כולל</div>
           <div className={`big-number ${totalProfit >= 0 ? 'profit' : 'loss'}`}>
-            {totalProfit >= 0 ? '+' : ''}₪{fmt(totalProfit)}
+            {valuedDeposits > 0 ? `${totalProfit >= 0 ? '+' : ''}₪${fmt(totalProfit)}` : '—'}
           </div>
         </div>
         <div className="card stat-card">
           <div className="summary-label">תשואה כוללת</div>
-          <div className={`big-number ${totalReturn >= 0 ? 'profit' : 'loss'}`}>
-            {totalReturn >= 0 ? '+' : ''}{fmtDec(totalReturn)}%
+          <div className={`big-number ${totalReturn !== null && totalReturn >= 0 ? 'profit' : 'loss'}`}>
+            {totalReturn !== null ? `${totalReturn >= 0 ? '+' : ''}${fmtDec(totalReturn)}%` : '—'}
           </div>
         </div>
       </div>
@@ -216,7 +159,7 @@ export default function Investments() {
                 <th>בית השקעות</th>
                 <th>מס' נייר</th>
                 <th>כמות יחידות</th>
-                <th>שווי יחידה</th>
+                <th>שווי יחידה (אג')</th>
                 <th>שווי עדכני</th>
                 <th>סה"כ הפקדות</th>
                 <th>רווח</th>
@@ -231,7 +174,9 @@ export default function Investments() {
                 const currentVal = calcCurrentValue(inv);
                 const profit = calcProfit(inv);
                 const ret = calcReturn(inv);
-                const portPct = totalCurrentValue > 0 ? ((currentVal / totalCurrentValue) * 100).toFixed(1) : 0;
+                const portPct = currentVal !== null && totalCurrentValue > 0
+                  ? ((currentVal / totalCurrentValue) * 100).toFixed(1)
+                  : null;
                 return (
                   <tr key={inv.id}>
                     <td><strong>{inv.name}</strong></td>
@@ -242,17 +187,17 @@ export default function Investments() {
                         ? <span className="ticker-badge">{inv.securityNumber}</span>
                         : <span className="no-ticker">—</span>}
                     </td>
-                    <td className="num">{inv.unitCount ? fmtDec(inv.unitCount, 4) : '—'}</td>
-                    <td className="num">{inv.unitPrice ? `${fmtDec(inv.unitPrice, 2)}` : '—'}</td>
-                    <td className="num">₪{fmt(currentVal)}</td>
+                    <td className="num">{inv.unitCount ? fmtDec(Number(inv.unitCount), 4) : '—'}</td>
+                    <td className="num">{inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
+                    <td className="num">{currentVal !== null ? `₪${fmt(currentVal)}` : '—'}</td>
                     <td className="num">₪{fmt(inv.totalDeposits)}</td>
-                    <td className={profit >= 0 ? 'positive' : 'negative'}>
-                      {profit >= 0 ? '+' : ''}₪{fmt(profit)}
+                    <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>
+                      {profit !== null ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}
                     </td>
                     <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>
                       {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
                     </td>
-                    <td className="num">{portPct}%</td>
+                    <td className="num">{portPct !== null ? `${portPct}%` : '—'}</td>
                     <td className="num">{pct(inv.accumulationFee)}</td>
                     <td className="actions-cell">
                       <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>
@@ -269,10 +214,10 @@ export default function Investments() {
                   <td className="num"><strong>₪{fmt(totalCurrentValue)}</strong></td>
                   <td className="num"><strong>₪{fmt(totalDeposits)}</strong></td>
                   <td className={totalProfit >= 0 ? 'positive' : 'negative'}>
-                    <strong>{totalProfit >= 0 ? '+' : ''}₪{fmt(totalProfit)}</strong>
+                    <strong>{valuedDeposits > 0 ? `${totalProfit >= 0 ? '+' : ''}₪${fmt(totalProfit)}` : '—'}</strong>
                   </td>
-                  <td className={totalReturn >= 0 ? 'positive' : 'negative'}>
-                    <strong>{totalReturn >= 0 ? '+' : ''}{fmtDec(totalReturn)}%</strong>
+                  <td className={totalReturn !== null && totalReturn >= 0 ? 'positive' : 'negative'}>
+                    <strong>{totalReturn !== null ? `${totalReturn >= 0 ? '+' : ''}${fmtDec(totalReturn)}%` : '—'}</strong>
                   </td>
                   <td colSpan={3} />
                 </tr>
@@ -308,19 +253,21 @@ export default function Investments() {
             </FormField>
             <FormField label="מספר נייר">
               <Input name="securityNumber" value={form.securityNumber} onChange={handleChange} placeholder="מספר נייר ערך" />
-              <div className="field-hint">משמש לעדכון אוטומטי של מחיר מבורסת ת"א</div>
             </FormField>
             <FormField label={'סה"כ הפקדות (₪)'}>
-              <Input name="totalDeposits" type="number" value={form.totalDeposits} onChange={handleChange} placeholder="0" min="0" required />
+              <Input name="totalDeposits" type="number" step="any" value={form.totalDeposits} onChange={handleChange} placeholder="0" min="0" required />
             </FormField>
             <FormField label="כמות יחידות">
-              <Input name="unitCount" type="number" step="0.0001" value={form.unitCount} onChange={handleChange} placeholder="0" />
+              <Input name="unitCount" type="number" step="any" value={form.unitCount} onChange={handleChange} placeholder="0" />
             </FormField>
-            <FormField label="שווי יחידה">
-              <Input name="unitPrice" type="number" step="0.01" value={form.unitPrice} onChange={handleChange} placeholder="0.00" />
+            <FormField label="שווי יחידה (אגורות)">
+              <Input name="unitPriceAgorot" type="number" step="any" value={form.unitPriceAgorot} onChange={handleChange} placeholder="לדוגמה: 15000 = ₪150" />
+              {form.unitPriceAgorot > 0 && (
+                <div className="field-hint">= ₪{fmtDec(Number(form.unitPriceAgorot) / 100, 2)} ליחידה</div>
+              )}
             </FormField>
             <FormField label="דמי ניהול צבירה (%)">
-              <Input name="accumulationFee" type="number" step="0.001" value={form.accumulationFee} onChange={handleChange} placeholder="0.000" />
+              <Input name="accumulationFee" type="number" step="any" value={form.accumulationFee} onChange={handleChange} placeholder="0.000" />
             </FormField>
             <FormActions onCancel={closeModal} submitLabel={editing ? 'עדכן' : 'הוסף'} />
           </form>
