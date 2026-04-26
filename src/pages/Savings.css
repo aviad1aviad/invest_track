@@ -1,0 +1,84 @@
+.savings-overview {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 700px) {
+  .savings-overview { grid-template-columns: 1fr; }
+}
+
+.savings-total-card {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.big-number {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #1a1a2e;
+}
+
+.savings-type-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 6px;
+}
+
+.type-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.88rem;
+}
+
+.type-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.type-name {
+  flex: 1;
+  color: #555;
+}
+
+.type-pct {
+  color: #888;
+  min-width: 42px;
+  text-align: left;
+}
+
+.type-amount {
+  font-weight: 700;
+  color: #1a1a2e;
+  min-width: 90px;
+  text-align: left;
+}
+
+.savings-chart-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.badge {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 12px;
+  background: #eef0ff;
+  color: #4361ee;
+  font-size: 0.8rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+tfoot .total-row td {
+  padding: 12px 14px;
+  border-top: 2px solid #e0e4f0;
+  background: #f5f7ff;
+}

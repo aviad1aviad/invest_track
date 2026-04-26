@@ -1,0 +1,145 @@
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 1100px) {
+  .kpi-grid { grid-template-columns: repeat(3, 1fr); }
+}
+
+@media (max-width: 700px) {
+  .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+}
+
+.kpi-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.kpi-label {
+  font-size: 0.78rem;
+  color: #888;
+  font-weight: 500;
+}
+
+.kpi-value {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: #1a1a2e;
+}
+
+.kpi-value.main {
+  font-size: 1.55rem;
+  color: #4361ee;
+}
+
+.kpi-value.profit { color: #1a7a4a; }
+.kpi-value.loss { color: #c0392b; }
+.kpi-value.expenses { color: #e94560; }
+
+.kpi-sub {
+  font-size: 0.78rem;
+  color: #aaa;
+}
+
+.kpi-sub.profit { color: #1a7a4a; }
+.kpi-sub.loss { color: #c0392b; }
+
+.dash-section {
+  margin-bottom: 18px;
+}
+
+.dash-section-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin: 0 0 16px 0;
+}
+
+.dash-chart-layout {
+  display: flex;
+  align-items: center;
+  gap: 32px;
+  flex-wrap: wrap;
+}
+
+.dash-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 280px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 0.9rem;
+}
+
+.legend-dot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-name {
+  flex: 1;
+  color: #444;
+}
+
+.legend-pct {
+  color: #888;
+  min-width: 45px;
+}
+
+.legend-amount {
+  font-weight: 700;
+  color: #1a1a2e;
+  min-width: 100px;
+  text-align: left;
+}
+
+.legend-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid #eee;
+  font-weight: 700;
+  color: #1a1a2e;
+  font-size: 0.92rem;
+}
+
+.dash-two-col {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+
+@media (max-width: 800px) {
+  .dash-two-col { grid-template-columns: 1fr; }
+}
+
+.mini-total {
+  text-align: center;
+  font-weight: 700;
+  color: #555;
+  font-size: 0.9rem;
+  margin-top: 8px;
+}
+
+.inv-badge {
+  background: #fff4e6;
+  color: #c07000;
+}
+
+tfoot .total-row td {
+  padding: 12px 14px;
+  border-top: 2px solid #e0e4f0;
+  background: #f5f7ff;
+}
