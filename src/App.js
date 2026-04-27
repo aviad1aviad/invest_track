@@ -67,6 +67,12 @@ function DataControls() {
 
 function AppInner() {
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const navigate = (tabId) => {
+    setActiveTab(tabId);
+    setSidebarOpen(false);
+  };
 
   const renderPage = () => {
     switch (activeTab) {
@@ -81,17 +87,21 @@ function AppInner() {
 
   return (
     <div className="app" dir="rtl">
-      <aside className="sidebar">
+      {/* Mobile overlay */}
+      {sidebarOpen && <div className="sidebar-overlay" onClick={() => setSidebarOpen(false)} />}
+
+      <aside className={`sidebar ${sidebarOpen ? 'sidebar-open' : ''}`}>
         <div className="sidebar-brand">
           <span className="brand-icon">📊</span>
           <span className="brand-name">ניהול כלכלי</span>
+          <button className="sidebar-close" onClick={() => setSidebarOpen(false)}>✕</button>
         </div>
         <nav className="sidebar-nav">
           {TABS.map(tab => (
             <button
               key={tab.id}
               className={`nav-item ${activeTab === tab.id ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => navigate(tab.id)}
             >
               <span className="nav-icon">{tab.icon}</span>
               <span className="nav-label">{tab.label}</span>
@@ -100,7 +110,13 @@ function AppInner() {
         </nav>
         <DataControls />
       </aside>
+
       <main className="main-content">
+        {/* Mobile topbar */}
+        <div className="mobile-topbar">
+          <button className="hamburger" onClick={() => setSidebarOpen(true)}>☰</button>
+          <span className="mobile-title">{TABS.find(t => t.id === activeTab)?.label}</span>
+        </div>
         {renderPage()}
       </main>
     </div>
