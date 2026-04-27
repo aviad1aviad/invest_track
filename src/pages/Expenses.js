@@ -13,9 +13,7 @@ const SAVINGS_DOMAIN = 'תיק השקעות';
 
 const EMPTY_FORM = { domain: 'דיור', name: '', amount: '', paymentMethod: '', paymentEntity: '' };
 
-function fmt(n) {
-  return Number(n).toLocaleString('he-IL');
-}
+function fmt(n) { return Number(n).toLocaleString('he-IL'); }
 
 export default function Expenses() {
   const { state, dispatch } = useApp();
@@ -26,7 +24,6 @@ export default function Expenses() {
   const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = (exp) => { setEditing(exp); setForm({ ...exp }); setShowModal(true); };
   const closeModal = () => setShowModal(false);
-
   const handleChange = e => setForm(f => ({ ...f, [e.target.name]: e.target.value }));
 
   const handleSubmit = e => {
@@ -44,7 +41,6 @@ export default function Expenses() {
     if (window.confirm('למחוק הוצאה זו?')) dispatch({ type: 'DELETE_EXPENSE', payload: id });
   };
 
-  // Group by domain — known ones first, then any custom domains
   const allDomains = [
     ...DOMAINS,
     ...state.expenses.map(e => e.domain).filter(d => d && !DOMAINS.includes(d)),
@@ -56,11 +52,12 @@ export default function Expenses() {
   }, {});
 
   const domainTotal = d => (byDomain[d] || []).reduce((s, e) => s + (Number(e.amount) || 0), 0);
-
   const grandTotal = state.expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const foodTotal = domainTotal(FOOD_DOMAIN);
   const savingsTotal = domainTotal(SAVINGS_DOMAIN);
   const baseTotal = grandTotal - foodTotal - savingsTotal;
+
+  const activeDomains = allDomains.filter(d => (byDomain[d] || []).length > 0);
 
   return (
     <div className="page">
@@ -96,7 +93,7 @@ export default function Expenses() {
           <span className="summary-value">₪{fmt(grandTotal)}</span>
         </div>
         <div className="domain-pills">
-          {allDomains.filter(d => (byDomain[d] || []).length > 0).map(d => (
+          {activeDomains.map(d => (
             <div key={d} className="domain-pill">
               <span className="pill-domain">{d}</span>
               <span className="pill-amount">₪{fmt(domainTotal(d))}</span>
@@ -105,43 +102,81 @@ export default function Expenses() {
         </div>
       </div>
 
-      {allDomains.map(domain => {
-        const rows = byDomain[domain] || [];
-        if (!rows.length) return null;
-        return (
-          <div key={domain} className="domain-section">
-            <div className="domain-header">
-              <span className="domain-name">{domain}</span>
-              <span className="domain-total">₪{fmt(domainTotal(domain))}</span>
-            </div>
-            <table className="data-table">
-              <thead>
-                <tr>
-                  <th>הוצאה</th>
-                  <th>כמות</th>
-                  <th>אמצעי תשלום</th>
-                  <th>גורם</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                {rows.map(exp => (
-                  <tr key={exp.id}>
-                    <td>{exp.name}</td>
-                    <td className="num">₪{fmt(exp.amount)}</td>
-                    <td>{exp.paymentMethod}</td>
-                    <td>{exp.paymentEntity}</td>
-                    <td className="actions-cell">
-                      <button className="icon-btn edit" onClick={() => openEdit(exp)}>✏️</button>
-                      <button className="icon-btn del" onClick={() => handleDelete(exp.id)}>🗑️</button>
-                    </td>
+      {/* Desktop: tables per domain */}
+      <div className="desktop-only">
+        {activeDomains.map(domain => {
+          const rows = byDomain[domain] || [];
+          return (
+            <div key={domain} className="domain-section">
+              <div className="domain-header">
+                <span className="domain-name">{domain}</span>
+                <span className="domain-total">₪{fmt(domainTotal(domain))}</span>
+              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>הוצאה</th><th>כמות</th><th>אמצעי תשלום</th><th>גורם</th><th></th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {rows.map(exp => (
+                    <tr key={exp.id}>
+                      <td>{exp.name}</td>
+                      <td className="num">₪{fmt(exp.amount)}</td>
+                      <td>{exp.paymentMethod}</td>
+                      <td>{exp.paymentEntity}</td>
+                      <td className="actions-cell">
+                        <button className="icon-btn" onClick={() => openEdit(exp)}>✏️</button>
+                        <button className="icon-btn" onClick={() => handleDelete(exp.id)}>🗑️</button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          );
+        })}
+      </div>
+
+      {/* Mobile: cards per domain */}
+      <div className="mobile-only">
+        {activeDomains.map(domain => {
+          const rows = byDomain[domain] || [];
+          return (
+            <div key={domain} className="exp-mobile-domain">
+              <div className="domain-header">
+                <span className="domain-name">{domain}</span>
+                <span className="domain-total">₪{fmt(domainTotal(domain))}</span>
+              </div>
+              {rows.map(exp => (
+                <div key={exp.id} className="exp-mcard">
+                  <div className="exp-mcard-main">
+                    <span className="exp-mcard-name">{exp.name}</span>
+                    <span className="exp-mcard-amount">₪{fmt(exp.amount)}</span>
+                    <div className="mcard-actions">
+                      <button className="icon-btn" onClick={() => openEdit(exp)}>✏️</button>
+                      <button className="icon-btn" onClick={() => handleDelete(exp.id)}>🗑️</button>
+                    </div>
+                  </div>
+                  {(exp.paymentMethod || exp.paymentEntity) && (
+                    <div className="exp-mcard-sub">
+                      {exp.paymentMethod && <span>{exp.paymentMethod}</span>}
+                      {exp.paymentMethod && exp.paymentEntity && <span> · </span>}
+                      {exp.paymentEntity && <span>{exp.paymentEntity}</span>}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          );
+        })}
+        {state.expenses.length > 0 && (
+          <div className="mcard-total">
+            <span>סה"כ חודשי</span>
+            <span>₪{fmt(grandTotal)}</span>
           </div>
-        );
-      })}
+        )}
+      </div>
 
       {state.expenses.length === 0 && (
         <div className="empty-state">

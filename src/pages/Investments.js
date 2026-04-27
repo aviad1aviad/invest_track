@@ -237,6 +237,7 @@ export default function Investments() {
             <div key={inv.id} className="mcard">
               <div className="mcard-header">
                 <span className="mcard-name">{inv.name}{isProvident && <span className="provident-tag">קופ"ג</span>}</span>
+                {inv.securityNumber && <span className="ticker-badge">{inv.securityNumber}</span>}
                 {inv.type && <span className="badge inv-badge">{inv.type}</span>}
                 <div className="mcard-actions">
                   <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>

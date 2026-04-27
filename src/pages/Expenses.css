@@ -128,3 +128,51 @@
   color: #4361ee;
   font-size: 0.95rem;
 }
+
+/* Mobile expense cards */
+.exp-mobile-domain {
+  margin-bottom: 18px;
+}
+
+.exp-mobile-domain .domain-header {
+  margin-bottom: 8px;
+  border-radius: 10px;
+}
+
+.exp-mcard {
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.exp-mcard-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.exp-mcard-name {
+  flex: 1;
+  font-weight: 600;
+  font-size: 0.92rem;
+  color: #1a1a2e;
+  min-width: 0;
+  word-break: break-word;
+}
+
+.exp-mcard-amount {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #4361ee;
+  white-space: nowrap;
+}
+
+.exp-mcard-sub {
+  margin-top: 6px;
+  font-size: 0.78rem;
+  color: #999;
+  padding-top: 6px;
+  border-top: 1px solid #f0f0f0;
+}
