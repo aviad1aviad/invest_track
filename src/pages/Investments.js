@@ -163,24 +163,15 @@ export default function Investments() {
         </div>
       )}
 
-      <div className="card inv-table-card">
-        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+      {/* Desktop table */}
+      <div className="card inv-table-card desktop-only">
+        <div style={{ overflowX: 'auto' }}>
           <table className="data-table">
             <thead>
               <tr>
-                <th>שם</th>
-                <th className="inv-col-hide">סוג</th>
-                <th className="inv-col-hide">בית השקעות</th>
-                <th className="inv-col-hide">מס' נייר</th>
-                <th className="inv-col-hide">כמות יחידות</th>
-                <th className="inv-col-hide">שווי יחידה (אג')</th>
-                <th>שווי עדכני</th>
-                <th>סה"כ הפקדות</th>
-                <th>רווח</th>
-                <th>תשואה</th>
-                <th className="inv-col-hide">% מהתיק</th>
-                <th className="inv-col-hide">דמי ניהול</th>
-                <th></th>
+                <th>שם</th><th>סוג</th><th>בית השקעות</th><th>מס' נייר</th>
+                <th>כמות יחידות</th><th>שווי יחידה (אג')</th><th>שווי עדכני</th>
+                <th>סה"כ הפקדות</th><th>רווח</th><th>תשואה</th><th>% מהתיק</th><th>דמי ניהול</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -190,33 +181,21 @@ export default function Investments() {
                 const profit = calcProfit(inv);
                 const ret = calcReturn(inv);
                 const portPct = currentVal !== null && totalCurrentValue > 0
-                  ? ((currentVal / totalCurrentValue) * 100).toFixed(1)
-                  : null;
+                  ? ((currentVal / totalCurrentValue) * 100).toFixed(1) : null;
                 return (
                   <tr key={inv.id}>
-                    <td>
-                      <strong>{inv.name}</strong>
-                      {isProvident && <span className="provident-tag">קופ"ג</span>}
-                    </td>
-                    <td className="inv-col-hide"><span className="badge inv-badge">{inv.type}</span></td>
-                    <td className="inv-col-hide">{inv.investmentHouse || '—'}</td>
-                    <td className="inv-col-hide">
-                      {inv.securityNumber
-                        ? <span className="ticker-badge">{inv.securityNumber}</span>
-                        : <span className="no-ticker">—</span>}
-                    </td>
-                    <td className="num inv-col-hide">{!isProvident && inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
-                    <td className="num inv-col-hide">{!isProvident && inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
+                    <td><strong>{inv.name}</strong>{isProvident && <span className="provident-tag">קופ"ג</span>}</td>
+                    <td><span className="badge inv-badge">{inv.type}</span></td>
+                    <td>{inv.investmentHouse || '—'}</td>
+                    <td>{inv.securityNumber ? <span className="ticker-badge">{inv.securityNumber}</span> : <span className="no-ticker">—</span>}</td>
+                    <td className="num">{!isProvident && inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
+                    <td className="num">{!isProvident && inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
                     <td className="num">{currentVal !== null ? `₪${fmt(currentVal)}` : '—'}</td>
                     <td className="num">₪{fmt(inv.totalDeposits)}</td>
-                    <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>
-                      {profit !== null ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}
-                    </td>
-                    <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>
-                      {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
-                    </td>
-                    <td className="num inv-col-hide">{portPct !== null ? `${portPct}%` : '—'}</td>
-                    <td className="num inv-col-hide">{pct(inv.accumulationFee)}</td>
+                    <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>{profit !== null ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}</td>
+                    <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>{ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}</td>
+                    <td className="num">{portPct !== null ? `${portPct}%` : '—'}</td>
+                    <td className="num">{pct(inv.accumulationFee)}</td>
                     <td className="actions-cell">
                       <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>
                       <button className="icon-btn" onClick={() => handleDelete(inv.id)}>🗑️</button>
@@ -228,27 +207,72 @@ export default function Investments() {
             {state.investments.length > 0 && (
               <tfoot>
                 <tr className="total-row">
-                  <td><strong>סה"כ</strong></td>
-                  <td className="inv-col-hide" /><td className="inv-col-hide" /><td className="inv-col-hide" />
-                  <td className="inv-col-hide" /><td className="inv-col-hide" />
+                  <td colSpan={6}><strong>סה"כ</strong></td>
                   <td className="num"><strong>₪{fmt(totalCurrentValue)}</strong></td>
                   <td className="num"><strong>₪{fmt(totalDeposits)}</strong></td>
-                  <td className={totalProfit >= 0 ? 'positive' : 'negative'}>
-                    <strong>{valuedDeposits > 0 ? `${totalProfit >= 0 ? '+' : ''}₪${fmt(totalProfit)}` : '—'}</strong>
-                  </td>
-                  <td className={totalReturn !== null && totalReturn >= 0 ? 'positive' : 'negative'}>
-                    <strong>{totalReturn !== null ? `${totalReturn >= 0 ? '+' : ''}${fmtDec(totalReturn)}%` : '—'}</strong>
-                  </td>
-                  <td className="inv-col-hide" /><td className="inv-col-hide" /><td />
+                  <td className={totalProfit >= 0 ? 'positive' : 'negative'}><strong>{valuedDeposits > 0 ? `${totalProfit >= 0 ? '+' : ''}₪${fmt(totalProfit)}` : '—'}</strong></td>
+                  <td className={totalReturn !== null && totalReturn >= 0 ? 'positive' : 'negative'}><strong>{totalReturn !== null ? `${totalReturn >= 0 ? '+' : ''}${fmtDec(totalReturn)}%` : '—'}</strong></td>
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             )}
           </table>
         </div>
         {state.investments.length === 0 && (
-          <div className="empty-state">
-            <p>אין השקעות עדיין</p>
-            <button className="btn btn-primary" onClick={openAdd}>הוסף השקעה ראשונה</button>
+          <div className="empty-state"><p>אין השקעות עדיין</p><button className="btn btn-primary" onClick={openAdd}>הוסף השקעה ראשונה</button></div>
+        )}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="mobile-only">
+        {sortedInvestments.length === 0 && (
+          <div className="empty-state"><p>אין השקעות עדיין</p><button className="btn btn-primary" onClick={openAdd}>הוסף השקעה ראשונה</button></div>
+        )}
+        {sortedInvestments.map(inv => {
+          const isProvident = inv.entryType === 'provident';
+          const currentVal = calcCurrentValue(inv);
+          const profit = calcProfit(inv);
+          const ret = calcReturn(inv);
+          return (
+            <div key={inv.id} className="mcard">
+              <div className="mcard-header">
+                <span className="mcard-name">{inv.name}{isProvident && <span className="provident-tag">קופ"ג</span>}</span>
+                {inv.type && <span className="badge inv-badge">{inv.type}</span>}
+                <div className="mcard-actions">
+                  <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>
+                  <button className="icon-btn" onClick={() => handleDelete(inv.id)}>🗑️</button>
+                </div>
+              </div>
+              <div className="mcard-row">
+                <div className="mcard-stat">
+                  <span className="mcard-label">שווי עדכני</span>
+                  <span className="mcard-value">{currentVal !== null ? `₪${fmt(currentVal)}` : '—'}</span>
+                </div>
+                <div className="mcard-stat">
+                  <span className="mcard-label">סה"כ הפקדות</span>
+                  <span className="mcard-value">₪{fmt(inv.totalDeposits)}</span>
+                </div>
+              </div>
+              <div className="mcard-row">
+                <div className="mcard-stat">
+                  <span className="mcard-label">רווח</span>
+                  <span className={`mcard-value ${profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}`}>
+                    {profit !== null ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}
+                  </span>
+                </div>
+                <div className="mcard-stat">
+                  <span className="mcard-label">תשואה</span>
+                  <span className={`mcard-value ${ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}`}>
+                    {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {sortedInvestments.length > 0 && (
+          <div className="mcard-total">
+            <span>שווי תיק</span><span>₪{fmt(totalCurrentValue)}</span>
           </div>
         )}
       </div>

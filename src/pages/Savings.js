@@ -10,14 +10,8 @@ const SUGGESTED_TYPES = ['מסלול מניות', 'סנפ 500', 'קרן כספי
 const COLORS = ['#4361ee', '#f7ae3a', '#b5b5b5', '#3ecf8e', '#e94560', '#a259ff', '#06d6a0', '#8ecae6'];
 
 const EMPTY_FORM = {
-  name: '',
-  type: '',
-  fundNumber: '',
-  managingCompany: '',
-  currentAmount: '',
-  totalDeposits: '',
-  depositFee: '',
-  accumulationFee: '',
+  name: '', type: '', fundNumber: '', managingCompany: '',
+  currentAmount: '', totalDeposits: '', depositFee: '', accumulationFee: '',
 };
 
 function fmt(n) { return Number(n).toLocaleString('he-IL'); }
@@ -65,7 +59,6 @@ export default function Savings() {
 
   const total = state.savings.reduce((s, sv) => s + (Number(sv.currentAmount) || 0), 0);
 
-  // Dynamic types from actual data, sorted high→low
   const allTypes = [...new Set(state.savings.map(s => s.type).filter(Boolean))];
   const pieData = allTypes.map((t, i) => ({
     name: t,
@@ -87,17 +80,14 @@ export default function Savings() {
           <div className="summary-label">סה"כ חסכונות</div>
           <div className="big-number">₪{fmt(total)}</div>
           <div className="savings-type-breakdown">
-            {pieData.map((entry, i) => {
-              const pctVal = total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0;
-              return (
-                <div key={entry.name} className="type-row">
-                  <span className="type-dot" style={{ background: entry.color }} />
-                  <span className="type-name">{entry.name}</span>
-                  <span className="type-pct">{pctVal}%</span>
-                  <span className="type-amount">₪{fmt(entry.value)}</span>
-                </div>
-              );
-            })}
+            {pieData.map((entry) => (
+              <div key={entry.name} className="type-row">
+                <span className="type-dot" style={{ background: entry.color }} />
+                <span className="type-name">{entry.name}</span>
+                <span className="type-pct">{total > 0 ? ((entry.value / total) * 100).toFixed(1) : 0}%</span>
+                <span className="type-amount">₪{fmt(entry.value)}</span>
+              </div>
+            ))}
           </div>
         </div>
 
@@ -116,71 +106,117 @@ export default function Savings() {
         )}
       </div>
 
-      <div className="card" style={{ marginTop: 0 }}>
+      {/* Desktop table */}
+      <div className="card desktop-only" style={{ marginTop: 0 }}>
         <div className="savings-table-wrap">
-        <table className="data-table">
-          <thead>
-            <tr>
-              <th>שם קרן</th>
-              <th>מסלול</th>
-              <th className="sav-col-hide">חברה מנהלת</th>
-              <th className="sav-col-hide">מס' קופה</th>
-              <th>סכום עדכני</th>
-              <th>סה"כ הפקדות</th>
-              <th>רווח</th>
-              <th>תשואה</th>
-              <th className="sav-col-hide">אחוז מהתיק</th>
-              <th className="sav-col-hide">דמי ניהול הפקדה</th>
-              <th className="sav-col-hide">דמי ניהול צבירה</th>
-              <th></th>
-            </tr>
-          </thead>
-          <tbody>
-            {sortedSavings.map(s => {
-              const ret = calcReturn(s);
-              const profit = (Number(s.currentAmount) || 0) - (Number(s.totalDeposits) || 0);
-              return (
-                <tr key={s.id}>
-                  <td><strong>{s.name}</strong></td>
-                  <td><span className="badge">{s.type}</span></td>
-                  <td className="sav-col-hide">{s.managingCompany || '—'}</td>
-                  <td className="sav-col-hide">{s.fundNumber || '—'}</td>
-                  <td className="num">₪{fmt(s.currentAmount)}</td>
-                  <td className="num">{s.totalDeposits ? `₪${fmt(s.totalDeposits)}` : '—'}</td>
-                  <td className={profit >= 0 ? 'positive' : 'negative'}>
-                    {s.totalDeposits ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}
-                  </td>
-                  <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>
-                    {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
-                  </td>
-                  <td className="num sav-col-hide">{total > 0 ? ((s.currentAmount / total) * 100).toFixed(1) : 0}%</td>
-                  <td className="num sav-col-hide">{pct(s.depositFee)}</td>
-                  <td className="num sav-col-hide">{pct(s.accumulationFee)}</td>
-                  <td className="actions-cell">
-                    <button className="icon-btn" onClick={() => openEdit(s)}>✏️</button>
-                    <button className="icon-btn" onClick={() => handleDelete(s.id)}>🗑️</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-          {state.savings.length > 0 && (
-            <tfoot>
-              <tr className="total-row">
-                <td colSpan={2}><strong>סה"כ</strong></td>
-                <td className="sav-col-hide" /><td className="sav-col-hide" />
-                <td className="num"><strong>₪{fmt(total)}</strong></td>
-                <td colSpan={3} />
-                <td className="sav-col-hide" /><td className="sav-col-hide" /><td className="sav-col-hide" />
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>שם קרן</th><th>מסלול</th><th>חברה מנהלת</th><th>מס' קופה</th>
+                <th>סכום עדכני</th><th>סה"כ הפקדות</th><th>רווח</th><th>תשואה</th>
+                <th>% מהתיק</th><th>דמי ניהול הפקדה</th><th>דמי ניהול צבירה</th><th></th>
               </tr>
-            </tfoot>
-          )}
-        </table>
+            </thead>
+            <tbody>
+              {sortedSavings.map(s => {
+                const ret = calcReturn(s);
+                const profit = (Number(s.currentAmount) || 0) - (Number(s.totalDeposits) || 0);
+                return (
+                  <tr key={s.id}>
+                    <td><strong>{s.name}</strong></td>
+                    <td><span className="badge">{s.type}</span></td>
+                    <td>{s.managingCompany || '—'}</td>
+                    <td>{s.fundNumber || '—'}</td>
+                    <td className="num">₪{fmt(s.currentAmount)}</td>
+                    <td className="num">{s.totalDeposits ? `₪${fmt(s.totalDeposits)}` : '—'}</td>
+                    <td className={profit >= 0 ? 'positive' : 'negative'}>
+                      {s.totalDeposits ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}
+                    </td>
+                    <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>
+                      {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
+                    </td>
+                    <td className="num">{total > 0 ? ((s.currentAmount / total) * 100).toFixed(1) : 0}%</td>
+                    <td className="num">{pct(s.depositFee)}</td>
+                    <td className="num">{pct(s.accumulationFee)}</td>
+                    <td className="actions-cell">
+                      <button className="icon-btn" onClick={() => openEdit(s)}>✏️</button>
+                      <button className="icon-btn" onClick={() => handleDelete(s.id)}>🗑️</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+            {state.savings.length > 0 && (
+              <tfoot>
+                <tr className="total-row">
+                  <td colSpan={4}><strong>סה"כ</strong></td>
+                  <td className="num"><strong>₪{fmt(total)}</strong></td>
+                  <td colSpan={7} />
+                </tr>
+              </tfoot>
+            )}
+          </table>
         </div>
         {state.savings.length === 0 && (
           <div className="empty-state">
             <p>אין חסכונות עדיין</p>
             <button className="btn btn-primary" onClick={openAdd}>הוסף חיסכון ראשון</button>
+          </div>
+        )}
+      </div>
+
+      {/* Mobile cards */}
+      <div className="mobile-only">
+        {sortedSavings.length === 0 && (
+          <div className="empty-state">
+            <p>אין חסכונות עדיין</p>
+            <button className="btn btn-primary" onClick={openAdd}>הוסף חיסכון ראשון</button>
+          </div>
+        )}
+        {sortedSavings.map(s => {
+          const ret = calcReturn(s);
+          const profit = (Number(s.currentAmount) || 0) - (Number(s.totalDeposits) || 0);
+          return (
+            <div key={s.id} className="mcard">
+              <div className="mcard-header">
+                <span className="mcard-name">{s.name}</span>
+                {s.type && <span className="badge">{s.type}</span>}
+                <div className="mcard-actions">
+                  <button className="icon-btn" onClick={() => openEdit(s)}>✏️</button>
+                  <button className="icon-btn" onClick={() => handleDelete(s.id)}>🗑️</button>
+                </div>
+              </div>
+              <div className="mcard-row">
+                <div className="mcard-stat">
+                  <span className="mcard-label">סכום עדכני</span>
+                  <span className="mcard-value">₪{fmt(s.currentAmount)}</span>
+                </div>
+                <div className="mcard-stat">
+                  <span className="mcard-label">סה"כ הפקדות</span>
+                  <span className="mcard-value">{s.totalDeposits ? `₪${fmt(s.totalDeposits)}` : '—'}</span>
+                </div>
+              </div>
+              <div className="mcard-row">
+                <div className="mcard-stat">
+                  <span className="mcard-label">רווח</span>
+                  <span className={`mcard-value ${s.totalDeposits ? (profit >= 0 ? 'positive' : 'negative') : ''}`}>
+                    {s.totalDeposits ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}
+                  </span>
+                </div>
+                <div className="mcard-stat">
+                  <span className="mcard-label">תשואה</span>
+                  <span className={`mcard-value ${ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}`}>
+                    {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          );
+        })}
+        {sortedSavings.length > 0 && (
+          <div className="mcard-total">
+            <span>סה"כ חסכונות</span>
+            <span>₪{fmt(total)}</span>
           </div>
         )}
       </div>
@@ -192,13 +228,8 @@ export default function Savings() {
               <Input name="name" value={form.name} onChange={handleChange} placeholder="קרן פנסיה / השתלמות..." required />
             </FormField>
             <FormField label="מסלול">
-              <Input
-                name="type"
-                value={form.type}
-                onChange={handleChange}
-                placeholder="מסלול מניות, סנפ 500..."
-                list="savings-types-list"
-              />
+              <Input name="type" value={form.type} onChange={handleChange}
+                placeholder="מסלול מניות, סנפ 500..." list="savings-types-list" />
               <datalist id="savings-types-list">
                 {SUGGESTED_TYPES.map(t => <option key={t} value={t} />)}
               </datalist>
