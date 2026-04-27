@@ -173,10 +173,6 @@ tfoot .total-row td {
   .type-name { min-width: 90px; }
   .type-amount { min-width: 70px; }
 
-  /* Force investments table to scroll horizontally */
   .inv-table-card > div { overflow-x: auto; -webkit-overflow-scrolling: touch; }
-  .inv-table-card .data-table { min-width: 820px; }
-
-  /* Hide least-critical columns on mobile */
   .inv-col-hide { display: none; }
 }

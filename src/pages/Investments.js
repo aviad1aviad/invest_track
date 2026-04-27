@@ -165,7 +165,7 @@ export default function Investments() {
 
       <div className="card inv-table-card">
         <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
-          <table className="data-table" style={{ minWidth: 820 }}>
+          <table className="data-table">
             <thead>
               <tr>
                 <th>שם</th>

@@ -88,5 +88,5 @@ tfoot .total-row td {
 @media (max-width: 700px) {
   .savings-overview { grid-template-columns: 1fr; }
   .big-number { font-size: 1.3rem; }
-  .savings-table-wrap .data-table { min-width: 720px; }
+  .sav-col-hide { display: none; }
 }

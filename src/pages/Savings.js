@@ -123,15 +123,15 @@ export default function Savings() {
             <tr>
               <th>שם קרן</th>
               <th>מסלול</th>
-              <th>חברה מנהלת</th>
-              <th>מס' קופה</th>
+              <th className="sav-col-hide">חברה מנהלת</th>
+              <th className="sav-col-hide">מס' קופה</th>
               <th>סכום עדכני</th>
               <th>סה"כ הפקדות</th>
               <th>רווח</th>
               <th>תשואה</th>
-              <th>אחוז מהתיק</th>
-              <th>דמי ניהול הפקדה</th>
-              <th>דמי ניהול צבירה</th>
+              <th className="sav-col-hide">אחוז מהתיק</th>
+              <th className="sav-col-hide">דמי ניהול הפקדה</th>
+              <th className="sav-col-hide">דמי ניהול צבירה</th>
               <th></th>
             </tr>
           </thead>
@@ -143,8 +143,8 @@ export default function Savings() {
                 <tr key={s.id}>
                   <td><strong>{s.name}</strong></td>
                   <td><span className="badge">{s.type}</span></td>
-                  <td>{s.managingCompany || '—'}</td>
-                  <td>{s.fundNumber || '—'}</td>
+                  <td className="sav-col-hide">{s.managingCompany || '—'}</td>
+                  <td className="sav-col-hide">{s.fundNumber || '—'}</td>
                   <td className="num">₪{fmt(s.currentAmount)}</td>
                   <td className="num">{s.totalDeposits ? `₪${fmt(s.totalDeposits)}` : '—'}</td>
                   <td className={profit >= 0 ? 'positive' : 'negative'}>
@@ -153,9 +153,9 @@ export default function Savings() {
                   <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>
                     {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
                   </td>
-                  <td className="num">{total > 0 ? ((s.currentAmount / total) * 100).toFixed(1) : 0}%</td>
-                  <td className="num">{pct(s.depositFee)}</td>
-                  <td className="num">{pct(s.accumulationFee)}</td>
+                  <td className="num sav-col-hide">{total > 0 ? ((s.currentAmount / total) * 100).toFixed(1) : 0}%</td>
+                  <td className="num sav-col-hide">{pct(s.depositFee)}</td>
+                  <td className="num sav-col-hide">{pct(s.accumulationFee)}</td>
                   <td className="actions-cell">
                     <button className="icon-btn" onClick={() => openEdit(s)}>✏️</button>
                     <button className="icon-btn" onClick={() => handleDelete(s.id)}>🗑️</button>
@@ -167,9 +167,11 @@ export default function Savings() {
           {state.savings.length > 0 && (
             <tfoot>
               <tr className="total-row">
-                <td colSpan={4}><strong>סה"כ</strong></td>
+                <td colSpan={2}><strong>סה"כ</strong></td>
+                <td className="sav-col-hide" /><td className="sav-col-hide" />
                 <td className="num"><strong>₪{fmt(total)}</strong></td>
-                <td colSpan={7} />
+                <td colSpan={3} />
+                <td className="sav-col-hide" /><td className="sav-col-hide" /><td className="sav-col-hide" />
               </tr>
             </tfoot>
           )}
