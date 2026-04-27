@@ -23,7 +23,8 @@ function calcInvCurrentValue(inv) {
   return (units * agorot) / 100;
 }
 
-const EXPENSE_COLORS = ['#4361ee', '#f7932a', '#3ecf8e', '#e94560', '#f7ae3a', '#a259ff', '#b5b5b5', '#06d6a0', '#8ecae6'];
+const EXPENSE_COLORS = ['#e94560', '#f7932a', '#f7ae3a', '#4361ee', '#a259ff', '#b5b5b5', '#06d6a0', '#8ecae6', '#4895ef'];
+const INCOME_COLORS  = ['#1a7a4a', '#3ecf8e', '#06d6a0', '#2ecc71', '#27ae60', '#52b788', '#74c69d', '#b7e4c7', '#40916c'];
 
 function SectionTitle({ children }) {
   return <h2 className="dash-section-title">{children}</h2>;
@@ -108,6 +109,15 @@ export default function Dashboard() {
     return acc;
   }, {});
   const expensePieData = Object.entries(expensesByDomain)
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => b.value - a.value);
+
+  // Incomes pie sorted
+  const incomesByDomain = (state.incomes || []).reduce((acc, i) => {
+    acc[i.domain] = (acc[i.domain] || 0) + (Number(i.amount) || 0);
+    return acc;
+  }, {});
+  const incomePieData = Object.entries(incomesByDomain)
     .map(([name, value]) => ({ name, value }))
     .sort((a, b) => b.value - a.value);
 
@@ -226,32 +236,64 @@ export default function Dashboard() {
         )}
       </div>
 
-      {/* Expenses */}
-      {expensePieData.length > 0 && (
-        <div className="card dash-section">
-          <SectionTitle>הוצאות חודשיות לפי תחום</SectionTitle>
-          <div className="dash-chart-layout">
-            <ResponsiveContainer width={220} height={220}>
-              <PieChart>
-                <Pie data={expensePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
-                  innerRadius={45} outerRadius={90}>
-                  {expensePieData.map((_, i) => <Cell key={i} fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={v => `₪${fmt(v)}`} />
-              </PieChart>
-            </ResponsiveContainer>
-            <div className="dash-legend">
-              {expensePieData.map((entry, i) => (
-                <div key={i} className="legend-row">
-                  <span className="legend-dot" style={{ background: EXPENSE_COLORS[i % EXPENSE_COLORS.length] }} />
-                  <span className="legend-name">{entry.name}</span>
-                  <span className="legend-pct">{totalExpenses > 0 ? ((entry.value / totalExpenses) * 100).toFixed(1) : 0}%</span>
-                  <span className="legend-amount">₪{fmt(entry.value)}</span>
+      {/* Income + Expenses row */}
+      {(incomePieData.length > 0 || expensePieData.length > 0) && (
+        <div className="dash-two-col">
+          {incomePieData.length > 0 && (
+            <div className="card dash-section">
+              <SectionTitle>הכנסות חודשיות לפי תחום</SectionTitle>
+              <div className="dash-chart-layout-sm">
+                <ResponsiveContainer width={200} height={200}>
+                  <PieChart>
+                    <Pie data={incomePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                      innerRadius={45} outerRadius={85}>
+                      {incomePieData.map((_, i) => <Cell key={i} fill={INCOME_COLORS[i % INCOME_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={v => `₪${fmt(v)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="dash-legend">
+                  {incomePieData.map((entry, i) => (
+                    <div key={i} className="legend-row">
+                      <span className="legend-dot" style={{ background: INCOME_COLORS[i % INCOME_COLORS.length] }} />
+                      <span className="legend-name">{entry.name}</span>
+                      <span className="legend-pct">{totalIncomes > 0 ? ((entry.value / totalIncomes) * 100).toFixed(1) : 0}%</span>
+                      <span className="legend-amount">₪{fmt(entry.value)}</span>
+                    </div>
+                  ))}
+                  <div className="legend-total"><span>סה"כ חודשי</span><span>₪{fmt(totalIncomes)}</span></div>
                 </div>
-              ))}
-              <div className="legend-total"><span>סה"כ חודשי</span><span>₪{fmt(totalExpenses)}</span></div>
+              </div>
             </div>
-          </div>
+          )}
+
+          {expensePieData.length > 0 && (
+            <div className="card dash-section">
+              <SectionTitle>הוצאות חודשיות לפי תחום</SectionTitle>
+              <div className="dash-chart-layout-sm">
+                <ResponsiveContainer width={200} height={200}>
+                  <PieChart>
+                    <Pie data={expensePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                      innerRadius={45} outerRadius={85}>
+                      {expensePieData.map((_, i) => <Cell key={i} fill={EXPENSE_COLORS[i % EXPENSE_COLORS.length]} />)}
+                    </Pie>
+                    <Tooltip formatter={v => `₪${fmt(v)}`} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="dash-legend">
+                  {expensePieData.map((entry, i) => (
+                    <div key={i} className="legend-row">
+                      <span className="legend-dot" style={{ background: EXPENSE_COLORS[i % EXPENSE_COLORS.length] }} />
+                      <span className="legend-name">{entry.name}</span>
+                      <span className="legend-pct">{totalExpenses > 0 ? ((entry.value / totalExpenses) * 100).toFixed(1) : 0}%</span>
+                      <span className="legend-amount">₪{fmt(entry.value)}</span>
+                    </div>
+                  ))}
+                  <div className="legend-total"><span>סה"כ חודשי</span><span>₪{fmt(totalExpenses)}</span></div>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
