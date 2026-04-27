@@ -82,3 +82,11 @@ tfoot .total-row td {
   border-top: 2px solid #e0e4f0;
   background: #f5f7ff;
 }
+
+.savings-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+
+@media (max-width: 700px) {
+  .savings-overview { grid-template-columns: 1fr; }
+  .big-number { font-size: 1.3rem; }
+  .savings-table-wrap .data-table { min-width: 720px; }
+}

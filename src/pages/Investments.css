@@ -164,3 +164,19 @@ tfoot .total-row td {
   border-top: 2px solid #e0e4f0;
   background: #f5f7ff;
 }
+
+@media (max-width: 700px) {
+  .inv-overview { grid-template-columns: repeat(2, 1fr); gap: 10px; }
+  .big-number { font-size: 1.1rem; }
+  .summary-label { font-size: 0.75rem; }
+  .inv-chart-layout { flex-direction: column; align-items: flex-start; }
+  .type-name { min-width: 90px; }
+  .type-amount { min-width: 70px; }
+
+  /* Force investments table to scroll horizontally */
+  .inv-table-card > div { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .inv-table-card .data-table { min-width: 820px; }
+
+  /* Hide least-critical columns on mobile */
+  .inv-col-hide { display: none; }
+}

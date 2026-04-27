@@ -6,9 +6,13 @@
 }
 
 @media (max-width: 700px) {
-  .page {
-    padding: 16px 14px;
-  }
+  .page { padding: 16px 14px; }
+
+  .data-table { font-size: 0.8rem; }
+  .data-table th, .data-table td { padding: 7px 8px; }
+
+  .page-title { font-size: 1.2rem; }
+  .btn { padding: 8px 14px; font-size: 0.85rem; }
 }
 
 .page-header {

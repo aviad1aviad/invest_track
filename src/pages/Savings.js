@@ -117,6 +117,7 @@ export default function Savings() {
       </div>
 
       <div className="card" style={{ marginTop: 0 }}>
+        <div className="savings-table-wrap">
         <table className="data-table">
           <thead>
             <tr>
@@ -173,6 +174,7 @@ export default function Savings() {
             </tfoot>
           )}
         </table>
+        </div>
         {state.savings.length === 0 && (
           <div className="empty-state">
             <p>אין חסכונות עדיין</p>

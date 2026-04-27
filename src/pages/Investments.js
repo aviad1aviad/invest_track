@@ -164,22 +164,22 @@ export default function Investments() {
       )}
 
       <div className="card inv-table-card">
-        <div style={{ overflowX: 'auto' }}>
-          <table className="data-table">
+        <div style={{ overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+          <table className="data-table" style={{ minWidth: 820 }}>
             <thead>
               <tr>
                 <th>שם</th>
-                <th>סוג</th>
-                <th>בית השקעות</th>
-                <th>מס' נייר</th>
-                <th>כמות יחידות</th>
-                <th>שווי יחידה (אג')</th>
+                <th className="inv-col-hide">סוג</th>
+                <th className="inv-col-hide">בית השקעות</th>
+                <th className="inv-col-hide">מס' נייר</th>
+                <th className="inv-col-hide">כמות יחידות</th>
+                <th className="inv-col-hide">שווי יחידה (אג')</th>
                 <th>שווי עדכני</th>
                 <th>סה"כ הפקדות</th>
                 <th>רווח</th>
                 <th>תשואה</th>
-                <th>% מהתיק</th>
-                <th>דמי ניהול</th>
+                <th className="inv-col-hide">% מהתיק</th>
+                <th className="inv-col-hide">דמי ניהול</th>
                 <th></th>
               </tr>
             </thead>
@@ -198,15 +198,15 @@ export default function Investments() {
                       <strong>{inv.name}</strong>
                       {isProvident && <span className="provident-tag">קופ"ג</span>}
                     </td>
-                    <td><span className="badge inv-badge">{inv.type}</span></td>
-                    <td>{inv.investmentHouse || '—'}</td>
-                    <td>
+                    <td className="inv-col-hide"><span className="badge inv-badge">{inv.type}</span></td>
+                    <td className="inv-col-hide">{inv.investmentHouse || '—'}</td>
+                    <td className="inv-col-hide">
                       {inv.securityNumber
                         ? <span className="ticker-badge">{inv.securityNumber}</span>
                         : <span className="no-ticker">—</span>}
                     </td>
-                    <td className="num">{!isProvident && inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
-                    <td className="num">{!isProvident && inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
+                    <td className="num inv-col-hide">{!isProvident && inv.unitCount ? fmt(Math.round(Number(inv.unitCount))) : '—'}</td>
+                    <td className="num inv-col-hide">{!isProvident && inv.unitPriceAgorot ? fmtDec(Number(inv.unitPriceAgorot), 2) : '—'}</td>
                     <td className="num">{currentVal !== null ? `₪${fmt(currentVal)}` : '—'}</td>
                     <td className="num">₪{fmt(inv.totalDeposits)}</td>
                     <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>
@@ -215,8 +215,8 @@ export default function Investments() {
                     <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>
                       {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
                     </td>
-                    <td className="num">{portPct !== null ? `${portPct}%` : '—'}</td>
-                    <td className="num">{pct(inv.accumulationFee)}</td>
+                    <td className="num inv-col-hide">{portPct !== null ? `${portPct}%` : '—'}</td>
+                    <td className="num inv-col-hide">{pct(inv.accumulationFee)}</td>
                     <td className="actions-cell">
                       <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>
                       <button className="icon-btn" onClick={() => handleDelete(inv.id)}>🗑️</button>
@@ -228,7 +228,9 @@ export default function Investments() {
             {state.investments.length > 0 && (
               <tfoot>
                 <tr className="total-row">
-                  <td colSpan={6}><strong>סה"כ</strong></td>
+                  <td><strong>סה"כ</strong></td>
+                  <td className="inv-col-hide" /><td className="inv-col-hide" /><td className="inv-col-hide" />
+                  <td className="inv-col-hide" /><td className="inv-col-hide" />
                   <td className="num"><strong>₪{fmt(totalCurrentValue)}</strong></td>
                   <td className="num"><strong>₪{fmt(totalDeposits)}</strong></td>
                   <td className={totalProfit >= 0 ? 'positive' : 'negative'}>
@@ -237,7 +239,7 @@ export default function Investments() {
                   <td className={totalReturn !== null && totalReturn >= 0 ? 'positive' : 'negative'}>
                     <strong>{totalReturn !== null ? `${totalReturn >= 0 ? '+' : ''}${fmtDec(totalReturn)}%` : '—'}</strong>
                   </td>
-                  <td colSpan={3} />
+                  <td className="inv-col-hide" /><td className="inv-col-hide" /><td />
                 </tr>
               </tfoot>
             )}
