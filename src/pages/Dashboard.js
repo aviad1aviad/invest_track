@@ -12,7 +12,7 @@ function getColor(name) {
   return colorCache[name];
 }
 
-function fmt(n) { return Number(n).toLocaleString('he-IL'); }
+function fmt(n) { return Math.round(Number(n)).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 
 function calcInvCurrentValue(inv) {
