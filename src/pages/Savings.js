@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import InsightsCard from '../components/common/InsightsCard';
+import { getSavingsInsights } from '../utils/insights';
 import './Page.css';
 import './Savings.css';
 
@@ -105,6 +107,10 @@ export default function Savings() {
           </div>
         )}
       </div>
+
+      {state.savings.length > 0 && (
+        <InsightsCard insights={getSavingsInsights(state.savings)} />
+      )}
 
       {/* Desktop table */}
       <div className="card desktop-only" style={{ marginTop: 0 }}>

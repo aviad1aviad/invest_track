@@ -2,6 +2,8 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
+import InsightsCard from '../components/common/InsightsCard';
+import { getExpenseInsights } from '../utils/insights';
 import './Page.css';
 import './Expenses.css';
 
@@ -85,6 +87,10 @@ export default function Expenses() {
             <div className="exp-kpi-sub">סה"כ כולל הכל</div>
           </div>
         </div>
+      )}
+
+      {state.expenses.length > 0 && (
+        <InsightsCard insights={getExpenseInsights(state.expenses)} />
       )}
 
       <div className="summary-bar">

@@ -1,6 +1,8 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import InsightsCard from '../components/common/InsightsCard';
+import { getDashboardInsights } from '../utils/insights';
 import './Page.css';
 import './Dashboard.css';
 
@@ -171,6 +173,8 @@ export default function Dashboard() {
           <div className="kpi-sub">הכנסות פחות הוצאות</div>
         </div>
       </div>
+
+      <InsightsCard insights={getDashboardInsights(state)} />
 
       {/* Global allocation */}
       {globalPieData.length > 0 && (

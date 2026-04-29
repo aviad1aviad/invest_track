@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import InsightsCard from '../components/common/InsightsCard';
+import { getInvestmentInsights } from '../utils/insights';
 import './Page.css';
 import './Investments.css';
 
@@ -161,6 +163,10 @@ export default function Investments() {
             </div>
           </div>
         </div>
+      )}
+
+      {state.investments.length > 0 && (
+        <InsightsCard insights={getInvestmentInsights(state.investments, calcCurrentValue)} />
       )}
 
       {/* Desktop table */}
