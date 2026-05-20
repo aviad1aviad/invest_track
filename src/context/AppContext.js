@@ -34,6 +34,28 @@ function reducer(state, action) {
       return { ...state, investments: state.investments.map(i => i.id === action.payload.id ? action.payload : i) };
     case 'DELETE_INVESTMENT':
       return { ...state, investments: state.investments.filter(i => i.id !== action.payload) };
+    case 'ADD_INVESTMENT_LOT': {
+      const { investmentId, lot } = action.payload;
+      return {
+        ...state,
+        investments: state.investments.map(inv =>
+          inv.id === investmentId
+            ? { ...inv, lots: [...(inv.lots || []), { ...lot, id: Date.now() }] }
+            : inv
+        ),
+      };
+    }
+    case 'DELETE_INVESTMENT_LOT': {
+      const { investmentId, lotId } = action.payload;
+      return {
+        ...state,
+        investments: state.investments.map(inv =>
+          inv.id === investmentId
+            ? { ...inv, lots: (inv.lots || []).filter(l => l.id !== lotId) }
+            : inv
+        ),
+      };
+    }
 
     case 'ADD_INCOME':
       return { ...state, incomes: [...state.incomes, { ...action.payload, id: Date.now() }] };

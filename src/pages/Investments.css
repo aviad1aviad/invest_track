@@ -165,6 +165,119 @@ tfoot .total-row td {
   background: #f5f7ff;
 }
 
+.usd-tag {
+  display: inline-block;
+  margin-right: 6px;
+  padding: 1px 6px;
+  background: #e8f0fe;
+  color: #1a56b0;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.usd-section {
+  background: #f8faff;
+  border: 1px solid #e0e4f0;
+  border-radius: 10px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+
+.usd-section-title {
+  font-weight: 700;
+  font-size: 0.88rem;
+  color: #1a1a2e;
+  margin-bottom: 10px;
+}
+
+.lots-total {
+  font-weight: 400;
+  color: #4361ee;
+}
+
+.rate-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.rate-row > *:first-child { flex: 1; }
+
+.rate-fetch-btn {
+  margin-bottom: 4px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.rate-preview {
+  font-size: 0.85rem;
+  color: #1a7a4a;
+  margin-top: 6px;
+}
+
+.lots-list {
+  margin-bottom: 10px;
+  font-size: 0.83rem;
+}
+
+.lots-header {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 32px;
+  gap: 4px;
+  padding: 4px 4px 6px;
+  color: #999;
+  font-size: 0.75rem;
+  border-bottom: 1px solid #e0e4f0;
+  margin-bottom: 4px;
+}
+
+.lot-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr 1fr 32px;
+  gap: 4px;
+  align-items: center;
+  padding: 5px 4px;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+.lot-date { color: #555; }
+.lot-usd { color: #1a56b0; font-weight: 600; }
+.lot-rate { color: #888; font-size: 0.78rem; }
+.lot-ils { color: #1a1a2e; font-weight: 700; }
+.lot-del { padding: 2px 4px; }
+
+.add-lot-form { margin-top: 8px; }
+
+.add-lot-inputs {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.lot-input {
+  border: 1.5px solid #d0d5e8;
+  border-radius: 8px;
+  padding: 7px 10px;
+  font-size: 0.88rem;
+  font-family: inherit;
+  outline: none;
+  background: #fff;
+}
+
+.lot-input:focus { border-color: #4361ee; }
+
+.lot-amount { width: 110px; }
+
+.lot-add-btn { padding: 7px 14px; font-size: 0.85rem; }
+
+.lot-error {
+  color: #c0392b;
+  font-size: 0.8rem;
+  margin-top: 6px;
+}
+
 @media (max-width: 700px) {
   .inv-overview { grid-template-columns: repeat(2, 1fr); gap: 10px; }
   .big-number { font-size: 1.1rem; }
@@ -175,4 +288,6 @@ tfoot .total-row td {
 
   .inv-table-card > div { overflow-x: auto; -webkit-overflow-scrolling: touch; }
   .inv-col-hide { display: none; }
+  .add-lot-inputs { flex-wrap: wrap; }
+  .rate-row { flex-direction: column; align-items: stretch; }
 }

@@ -5,6 +5,7 @@ import Expenses from './pages/Expenses';
 import Savings from './pages/Savings';
 import Investments from './pages/Investments';
 import Incomes from './pages/Incomes';
+import * as XLSX from 'xlsx';
 import './App.css';
 
 const TABS = [
@@ -28,6 +29,88 @@ function DataControls() {
     a.download = `invest-track-${new Date().toISOString().slice(0, 10)}.json`;
     a.click();
     URL.revokeObjectURL(url);
+  };
+
+  const handleExportExcel = () => {
+    const wb = XLSX.utils.book_new();
+
+    // חסכונות
+    const savingsRows = (state.savings || []).map(s => {
+      const deposits = Number(s.totalDeposits) || 0;
+      const current = Number(s.currentAmount) || 0;
+      const profit = deposits ? current - deposits : '';
+      const ret = deposits ? ((current - deposits) / deposits * 100).toFixed(2) + '%' : '';
+      return {
+        'שם קרן': s.name,
+        'מסלול': s.type,
+        'חברה מנהלת': s.managingCompany,
+        'מספר קופה': s.fundNumber,
+        'סכום עדכני (₪)': current,
+        'סה"כ הפקדות (₪)': deposits || '',
+        'רווח (₪)': profit,
+        'תשואה': ret,
+        'דמי ניהול הפקדה (%)': s.depositFee,
+        'דמי ניהול צבירה (%)': s.accumulationFee,
+      };
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(savingsRows), 'חסכונות');
+
+    // השקעות
+    const invRows = (state.investments || []).map(inv => {
+      const isUSD = inv.currency === 'USD';
+      const deposits = isUSD && inv.lots?.length
+        ? inv.lots.reduce((s, l) => s + (Number(l.amountILS) || 0), 0)
+        : Number(inv.totalDeposits) || 0;
+      let currentILS = '';
+      if (isUSD) {
+        const usd = Number(inv.currentValueUSD) || 0;
+        const rate = Number(inv.currentExchangeRate) || 0;
+        currentILS = usd && rate ? usd * rate : '';
+      } else if (inv.entryType === 'provident') {
+        currentILS = Number(inv.currentValue) || '';
+      } else {
+        const units = Number(inv.unitCount) || 0;
+        const agorot = Number(inv.unitPriceAgorot) || 0;
+        currentILS = units && agorot ? (units * agorot) / 100 : '';
+      }
+      const profit = currentILS && deposits ? currentILS - deposits : '';
+      const ret = profit !== '' && deposits ? (profit / deposits * 100).toFixed(2) + '%' : '';
+      return {
+        'שם': inv.name,
+        'סוג': inv.type,
+        'בית השקעות': inv.investmentHouse,
+        'מספר נייר': inv.securityNumber,
+        'מטבע': isUSD ? 'USD' : 'ILS',
+        'שווי נוכחי (₪)': currentILS !== '' ? Math.round(currentILS) : '',
+        'שווי נוכחי ($)': isUSD ? inv.currentValueUSD : '',
+        'שער דולר': isUSD ? inv.currentExchangeRate : '',
+        'סה"כ הפקדות (₪)': Math.round(deposits),
+        'רווח (₪)': profit !== '' ? Math.round(profit) : '',
+        'תשואה': ret,
+        'דמי ניהול (%)': inv.accumulationFee,
+      };
+    });
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(invRows), 'השקעות');
+
+    // הוצאות קבועות
+    const expRows = (state.expenses || []).map(e => ({
+      'תחום': e.domain,
+      'שם הוצאה': e.name,
+      'סכום (₪)': Number(e.amount),
+      'אמצעי תשלום': e.paymentMethod,
+      'גורם': e.paymentEntity,
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(expRows), 'הוצאות קבועות');
+
+    // הכנסות
+    const incRows = (state.incomes || []).map(i => ({
+      'תחום': i.domain,
+      'שם הכנסה': i.name,
+      'סכום (₪)': Number(i.amount),
+    }));
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(incRows), 'הכנסות');
+
+    XLSX.writeFile(wb, `ניהול-כלכלי-${new Date().toISOString().slice(0, 10)}.xlsx`);
   };
 
   const handleImport = e => {
@@ -54,12 +137,9 @@ function DataControls() {
 
   return (
     <div className="data-controls">
-      <button className="data-btn" onClick={handleExport} title="ייצא נתונים">
-        ⬇ ייצוא
-      </button>
-      <button className="data-btn" onClick={() => importRef.current.click()} title="ייבא נתונים">
-        ⬆ ייבוא
-      </button>
+      <button className="data-btn" onClick={handleExport} title="ייצא נתונים">⬇ ייצוא</button>
+      <button className="data-btn" onClick={() => importRef.current.click()} title="ייבא JSON">⬆ ייבוא</button>
+      <button className="data-btn excel-btn" onClick={handleExportExcel} title="ייצא לאקסל">📊 Excel</button>
       <input ref={importRef} type="file" accept=".json" onChange={handleImport} style={{ display: 'none' }} />
     </div>
   );
