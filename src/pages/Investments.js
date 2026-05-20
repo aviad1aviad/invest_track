@@ -24,11 +24,6 @@ const EMPTY_FORM = {
 
 function fmt(n) { return Math.round(Number(n)).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
-function fmtUnits(n) {
-  const num = Number(n);
-  if (!num) return '—';
-  return num % 1 === 0 ? num.toLocaleString('he-IL') : num.toLocaleString('he-IL', { maximumFractionDigits: 4 });
-}
 function pct(n) { return n !== '' && n !== undefined && n !== 0 ? `${Number(n).toFixed(3)}%` : '—'; }
 
 function calcCurrentValue(inv) {
