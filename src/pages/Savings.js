@@ -32,6 +32,8 @@ export default function Savings() {
   const [showModal, setShowModal] = useState(false);
   const [editing, setEditing] = useState(null);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [filterType, setFilterType] = useState('');
+  const [filterCompany, setFilterCompany] = useState('');
 
   const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = s => { setEditing(s); setForm({ ...s }); setShowModal(true); };
@@ -69,6 +71,14 @@ export default function Savings() {
   })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
 
   const sortedSavings = [...state.savings].sort((a, b) => (Number(b.currentAmount) || 0) - (Number(a.currentAmount) || 0));
+
+  const uniqueTypes = [...new Set(state.savings.map(s => s.type).filter(Boolean))].sort();
+  const uniqueCompanies = [...new Set(state.savings.map(s => s.managingCompany).filter(Boolean))].sort();
+
+  const filteredSavings = sortedSavings.filter(s =>
+    (!filterType || s.type === filterType) &&
+    (!filterCompany || s.managingCompany === filterCompany)
+  );
 
   return (
     <div className="page">
@@ -112,6 +122,26 @@ export default function Savings() {
         <InsightsCard insights={getSavingsInsights(state.savings)} />
       )}
 
+      {(uniqueTypes.length > 1 || uniqueCompanies.length > 1) && (
+        <div className="filter-bar">
+          {uniqueTypes.length > 1 && (
+            <select className="filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <option value="">כל המסלולים</option>
+              {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+          {uniqueCompanies.length > 1 && (
+            <select className="filter-select" value={filterCompany} onChange={e => setFilterCompany(e.target.value)}>
+              <option value="">כל החברות המנהלות</option>
+              {uniqueCompanies.map(c => <option key={c} value={c}>{c}</option>)}
+            </select>
+          )}
+          {(filterType || filterCompany) && (
+            <button className="filter-clear" onClick={() => { setFilterType(''); setFilterCompany(''); }}>✕ נקה</button>
+          )}
+        </div>
+      )}
+
       {/* Desktop table */}
       <div className="card desktop-only" style={{ marginTop: 0 }}>
         <div className="savings-table-wrap">
@@ -124,7 +154,7 @@ export default function Savings() {
               </tr>
             </thead>
             <tbody>
-              {sortedSavings.map(s => {
+              {filteredSavings.map(s => {
                 const ret = calcReturn(s);
                 const profit = (Number(s.currentAmount) || 0) - (Number(s.totalDeposits) || 0);
                 return (
@@ -173,7 +203,7 @@ export default function Savings() {
 
       {/* Mobile cards */}
       <div className="mobile-only">
-        {sortedSavings.length === 0 && (
+        {filteredSavings.length === 0 && (
           <div className="empty-state">
             <p>אין חסכונות עדיין</p>
             <button className="btn btn-primary" onClick={openAdd}>הוסף חיסכון ראשון</button>
@@ -219,7 +249,7 @@ export default function Savings() {
             </div>
           );
         })}
-        {sortedSavings.length > 0 && (
+        {filteredSavings.length > 0 && (
           <div className="mcard-total">
             <span>סה"כ חסכונות</span>
             <span>₪{fmt(total)}</span>

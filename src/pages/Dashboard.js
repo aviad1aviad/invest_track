@@ -18,6 +18,11 @@ function fmt(n) { return Math.round(Number(n)).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 
 function calcInvCurrentValue(inv) {
+  if (inv.currency === 'USD') {
+    const usd = Number(inv.currentValueUSD) || 0;
+    const rate = Number(inv.currentExchangeRate) || 0;
+    return usd && rate ? usd * rate : 0;
+  }
   if (inv.entryType === 'provident') return Number(inv.currentValue) || 0;
   const units = Number(inv.unitCount) || 0;
   const agorot = Number(inv.unitPriceAgorot) || 0;

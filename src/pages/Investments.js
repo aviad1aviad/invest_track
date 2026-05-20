@@ -126,6 +126,8 @@ export default function Investments() {
   const [pendingLots, setPendingLots] = useState([]);
   const [rateLoading, setRateLoading] = useState(false);
   const [rateError, setRateError] = useState('');
+  const [filterType, setFilterType] = useState('');
+  const [filterHouse, setFilterHouse] = useState('');
 
   const openAdd = () => {
     setEditing(null);
@@ -214,6 +216,14 @@ export default function Investments() {
 
   const sortedInvestments = [...state.investments].sort((a, b) => (calcCurrentValue(b) ?? 0) - (calcCurrentValue(a) ?? 0));
 
+  const uniqueTypes = [...new Set(state.investments.map(inv => inv.type).filter(Boolean))].sort();
+  const uniqueHouses = [...new Set(state.investments.map(inv => inv.investmentHouse).filter(Boolean))].sort();
+
+  const filteredInvestments = sortedInvestments.filter(inv =>
+    (!filterType || inv.type === filterType) &&
+    (!filterHouse || inv.investmentHouse === filterHouse)
+  );
+
   const isSecurity = form.entryType === 'security';
   const isUSD = form.currency === 'USD';
 
@@ -252,6 +262,26 @@ export default function Investments() {
         </div>
       </div>
 
+      {(uniqueTypes.length > 1 || uniqueHouses.length > 1) && (
+        <div className="filter-bar">
+          {uniqueTypes.length > 1 && (
+            <select className="filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <option value="">כל המסלולים</option>
+              {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+          {uniqueHouses.length > 1 && (
+            <select className="filter-select" value={filterHouse} onChange={e => setFilterHouse(e.target.value)}>
+              <option value="">כל בתי ההשקעות</option>
+              {uniqueHouses.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          )}
+          {(filterType || filterHouse) && (
+            <button className="filter-clear" onClick={() => { setFilterType(''); setFilterHouse(''); }}>✕ נקה</button>
+          )}
+        </div>
+      )}
+
       {pieData.length > 0 && (
         <div className="card inv-chart-card">
           <h3 className="card-section-title">פיזור לפי סוג השקעה</h3>
@@ -288,13 +318,13 @@ export default function Investments() {
           <table className="data-table">
             <thead>
               <tr>
-                <th>שם</th><th>סוג</th><th>בית השקעות</th><th>מס' נייר</th>
+                <th>שם</th><th>מסלול</th><th>בית השקעות</th><th>מס' נייר</th>
                 <th>שווי עדכני</th><th>סה"כ הפקדות</th><th>רווח</th><th>תשואה</th>
                 <th>% מהתיק</th><th>דמי ניהול</th><th></th>
               </tr>
             </thead>
             <tbody>
-              {sortedInvestments.map(inv => {
+              {filteredInvestments.map(inv => {
                 const isProvident = inv.entryType === 'provident';
                 const isUSDInv = inv.currency === 'USD';
                 const currentVal = calcCurrentValue(inv);
@@ -354,7 +384,7 @@ export default function Investments() {
         {sortedInvestments.length === 0 && (
           <div className="empty-state"><p>אין השקעות עדיין</p><button className="btn btn-primary" onClick={openAdd}>הוסף השקעה ראשונה</button></div>
         )}
-        {sortedInvestments.map(inv => {
+        {filteredInvestments.map(inv => {
           const isProvident = inv.entryType === 'provident';
           const isUSDInv = inv.currency === 'USD';
           const currentVal = calcCurrentValue(inv);
@@ -440,7 +470,7 @@ export default function Investments() {
               <Input name="name" value={form.name} onChange={handleChange}
                 placeholder={isUSD ? 'Apple, Tesla...' : isSecurity ? 'שם קרן / נייר ערך' : 'שם קופת הגמל'} required />
             </FormField>
-            <FormField label="סוג השקעה">
+            <FormField label="מסלול">
               <Input name="type" value={form.type} onChange={handleChange}
                 placeholder="מדד עולמי, ביטקוין..." list="inv-types-list" />
               <datalist id="inv-types-list">
