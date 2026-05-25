@@ -80,6 +80,8 @@ export default function Savings() {
     (!filterCompany || s.managingCompany === filterCompany)
   );
 
+  const filteredTotal = filteredSavings.reduce((s, sv) => s + (Number(sv.currentAmount) || 0), 0);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -182,11 +184,11 @@ export default function Savings() {
                 );
               })}
             </tbody>
-            {state.savings.length > 0 && (
+            {filteredSavings.length > 0 && (
               <tfoot>
                 <tr className="total-row">
-                  <td colSpan={4}><strong>סה"כ</strong></td>
-                  <td className="num"><strong>₪{fmt(total)}</strong></td>
+                  <td colSpan={4}><strong>סה"כ{(filterType || filterCompany) ? ' (מסונן)' : ''}</strong></td>
+                  <td className="num"><strong>₪{fmt(filteredTotal)}</strong></td>
                   <td colSpan={7} />
                 </tr>
               </tfoot>
@@ -251,8 +253,8 @@ export default function Savings() {
         })}
         {filteredSavings.length > 0 && (
           <div className="mcard-total">
-            <span>סה"כ חסכונות</span>
-            <span>₪{fmt(total)}</span>
+            <span>סה"כ{(filterType || filterCompany) ? ' (מסונן)' : ' חסכונות'}</span>
+            <span>₪{fmt(filteredTotal)}</span>
           </div>
         )}
       </div>

@@ -16,6 +16,12 @@ const TABS = [
   { id: 'investments', label: 'השקעות', icon: '📈' },
 ];
 
+function SyncIndicator() {
+  const { syncing } = useApp();
+  if (!syncing) return null;
+  return <span className="sync-indicator">מסנכרן...</span>;
+}
+
 function DataControls() {
   const { state, dispatch } = useApp();
   const importRef = useRef();
@@ -189,6 +195,7 @@ function AppInner() {
           ))}
         </nav>
         <DataControls />
+        <SyncIndicator />
       </aside>
 
       <main className="main-content">

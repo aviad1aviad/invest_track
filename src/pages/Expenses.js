@@ -7,11 +7,11 @@ import { getExpenseInsights } from '../utils/insights';
 import './Page.css';
 import './Expenses.css';
 
-const DOMAINS = ['דיור', 'בית', 'אוכל', 'בריאות', 'חינוך', 'חוגים', 'תחבורה', 'תקשורת', 'שונות', 'תיק השקעות'];
+const DOMAINS = ['דיור', 'בית', 'אוכל', 'בריאות', 'חינוך', 'חוגים', 'תחבורה', 'תקשורת', 'שונות', 'חיסכון'];
 const PAYMENT_METHODS = ["צ'ק", 'כרטיס אשראי', 'הוראת קבע', 'העברה בנקאית'];
 
 const FOOD_DOMAIN = 'אוכל';
-const SAVINGS_DOMAIN = 'תיק השקעות';
+const SAVINGS_DOMAIN = 'חיסכון';
 
 const EMPTY_FORM = { domain: 'דיור', name: '', amount: '', paymentMethod: '', paymentEntity: '' };
 

@@ -224,6 +224,12 @@ export default function Investments() {
     (!filterHouse || inv.investmentHouse === filterHouse)
   );
 
+  const filteredCurrentValue = filteredInvestments.reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0);
+  const filteredDeposits = filteredInvestments.reduce((s, inv) => s + getDeposits(inv), 0);
+  const filteredValuedDeposits = filteredInvestments.filter(inv => calcCurrentValue(inv) !== null).reduce((s, inv) => s + getDeposits(inv), 0);
+  const filteredProfit = filteredCurrentValue - filteredValuedDeposits;
+  const filteredReturn = filteredValuedDeposits > 0 ? (filteredProfit / filteredValuedDeposits) * 100 : null;
+
   const isSecurity = form.entryType === 'security';
   const isUSD = form.currency === 'USD';
 
@@ -262,26 +268,6 @@ export default function Investments() {
         </div>
       </div>
 
-      {(uniqueTypes.length > 1 || uniqueHouses.length > 1) && (
-        <div className="filter-bar">
-          {uniqueTypes.length > 1 && (
-            <select className="filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
-              <option value="">כל המסלולים</option>
-              {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
-            </select>
-          )}
-          {uniqueHouses.length > 1 && (
-            <select className="filter-select" value={filterHouse} onChange={e => setFilterHouse(e.target.value)}>
-              <option value="">כל בתי ההשקעות</option>
-              {uniqueHouses.map(h => <option key={h} value={h}>{h}</option>)}
-            </select>
-          )}
-          {(filterType || filterHouse) && (
-            <button className="filter-clear" onClick={() => { setFilterType(''); setFilterHouse(''); }}>✕ נקה</button>
-          )}
-        </div>
-      )}
-
       {pieData.length > 0 && (
         <div className="card inv-chart-card">
           <h3 className="card-section-title">פיזור לפי סוג השקעה</h3>
@@ -310,6 +296,26 @@ export default function Investments() {
 
       {state.investments.length > 0 && (
         <InsightsCard insights={getInvestmentInsights(state.investments, calcCurrentValue)} />
+      )}
+
+      {(uniqueTypes.length > 1 || uniqueHouses.length > 1) && (
+        <div className="filter-bar">
+          {uniqueTypes.length > 1 && (
+            <select className="filter-select" value={filterType} onChange={e => setFilterType(e.target.value)}>
+              <option value="">כל המסלולים</option>
+              {uniqueTypes.map(t => <option key={t} value={t}>{t}</option>)}
+            </select>
+          )}
+          {uniqueHouses.length > 1 && (
+            <select className="filter-select" value={filterHouse} onChange={e => setFilterHouse(e.target.value)}>
+              <option value="">כל בתי ההשקעות</option>
+              {uniqueHouses.map(h => <option key={h} value={h}>{h}</option>)}
+            </select>
+          )}
+          {(filterType || filterHouse) && (
+            <button className="filter-clear" onClick={() => { setFilterType(''); setFilterHouse(''); }}>✕ נקה</button>
+          )}
+        </div>
       )}
 
       {/* Desktop table */}
@@ -360,14 +366,14 @@ export default function Investments() {
                 );
               })}
             </tbody>
-            {state.investments.length > 0 && (
+            {filteredInvestments.length > 0 && (
               <tfoot>
                 <tr className="total-row">
-                  <td colSpan={4}><strong>סה"כ</strong></td>
-                  <td className="num"><strong>₪{fmt(totalCurrentValue)}</strong></td>
-                  <td className="num"><strong>₪{fmt(totalDepositsAll)}</strong></td>
-                  <td className={totalProfit >= 0 ? 'positive' : 'negative'}><strong>{valuedDeposits > 0 ? `${totalProfit >= 0 ? '+' : ''}₪${fmt(totalProfit)}` : '—'}</strong></td>
-                  <td className={totalReturn !== null && totalReturn >= 0 ? 'positive' : 'negative'}><strong>{totalReturn !== null ? `${totalReturn >= 0 ? '+' : ''}${fmtDec(totalReturn)}%` : '—'}</strong></td>
+                  <td colSpan={4}><strong>סה"כ{(filterType || filterHouse) ? ' (מסונן)' : ''}</strong></td>
+                  <td className="num"><strong>₪{fmt(filteredCurrentValue)}</strong></td>
+                  <td className="num"><strong>₪{fmt(filteredDeposits)}</strong></td>
+                  <td className={filteredProfit >= 0 ? 'positive' : 'negative'}><strong>{filteredValuedDeposits > 0 ? `${filteredProfit >= 0 ? '+' : ''}₪${fmt(filteredProfit)}` : '—'}</strong></td>
+                  <td className={filteredReturn !== null && filteredReturn >= 0 ? 'positive' : 'negative'}><strong>{filteredReturn !== null ? `${filteredReturn >= 0 ? '+' : ''}${fmtDec(filteredReturn)}%` : '—'}</strong></td>
                   <td colSpan={3} />
                 </tr>
               </tfoot>
@@ -434,8 +440,11 @@ export default function Investments() {
             </div>
           );
         })}
-        {sortedInvestments.length > 0 && (
-          <div className="mcard-total"><span>שווי תיק</span><span>₪{fmt(totalCurrentValue)}</span></div>
+        {filteredInvestments.length > 0 && (
+          <div className="mcard-total">
+            <span>שווי{(filterType || filterHouse) ? ' (מסונן)' : ' תיק'}</span>
+            <span>₪{fmt(filteredCurrentValue)}</span>
+          </div>
         )}
       </div>
 
