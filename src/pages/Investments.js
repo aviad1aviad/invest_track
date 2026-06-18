@@ -56,18 +56,6 @@ function getDeposits(inv) {
   return Number(inv.totalDeposits) || 0;
 }
 
-function calcProfit(inv) {
-  const val = calcCurrentValue(inv);
-  if (val === null) return null;
-  return val - getDeposits(inv);
-}
-
-function calcReturn(inv) {
-  const deposits = getDeposits(inv);
-  const profit = calcProfit(inv);
-  if (!deposits || profit === null) return null;
-  return (profit / deposits) * 100;
-}
 
 function parsePsagotExcel(file) {
   return new Promise((resolve, reject) => {
