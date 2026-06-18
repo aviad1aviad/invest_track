@@ -9,14 +9,84 @@ const INITIAL_STATE = {
   savings: [],
   investments: [],
   incomes: [],
+  snapshots: [],
 };
 
 const DOC_REF = doc(db, 'userData', 'main');
+
+function calcInvValue(inv) {
+  if (inv.currency === 'USD') {
+    const usd = Number(inv.currentValueUSD) || 0;
+    const rate = Number(inv.currentExchangeRate) || 0;
+    return usd && rate ? usd * rate : 0;
+  }
+  if (inv.entryType === 'provident') return Number(inv.currentValue) || 0;
+  const units = Number(inv.unitCount) || 0;
+  const agorot = Number(inv.unitPriceAgorot) || 0;
+  return units && agorot ? (units * agorot) / 100 : 0;
+}
+
+function getInvDeposits(inv) {
+  if (inv.currency === 'USD' && inv.lots?.length > 0)
+    return inv.lots.reduce((s, l) => s + (Number(l.amountILS) || 0), 0);
+  return Number(inv.totalDeposits) || 0;
+}
+
+function buildSnapshot(data) {
+  const savingsDetail = (data.savings || []).map(sv => ({
+    id: sv.id,
+    name: sv.name,
+    amount: Math.round(Number(sv.currentAmount) || 0),
+    deposits: Math.round(Number(sv.totalDeposits) || 0),
+  }));
+
+  const investmentsDetail = (data.investments || []).map(inv => ({
+    id: inv.id,
+    name: inv.name,
+    valueILS: Math.round(calcInvValue(inv)),
+    deposits: Math.round(getInvDeposits(inv)),
+  }));
+
+  const totalSavings = savingsDetail.reduce((s, sv) => s + sv.amount, 0);
+  const totalInvestments = investmentsDetail.reduce((s, inv) => s + inv.valueILS, 0);
+
+  return {
+    date: new Date().toISOString().slice(0, 10),
+    totalSavings,
+    totalInvestments,
+    grandTotal: totalSavings + totalInvestments,
+    savingsDetail,
+    investmentsDetail,
+  };
+}
+
+function isSnapshotDue(snapshots) {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const day = today.getDate();
+  const year = today.getFullYear();
+  const month = today.getMonth();
+
+  const lastScheduled = day >= 20
+    ? new Date(year, month, 20)
+    : new Date(year, month, 1);
+  lastScheduled.setHours(0, 0, 0, 0);
+
+  if (!snapshots || snapshots.length === 0) return true;
+
+  const lastDate = new Date(snapshots[snapshots.length - 1].date);
+  lastDate.setHours(0, 0, 0, 0);
+
+  return lastDate < lastScheduled;
+}
 
 function reducer(state, action) {
   switch (action.type) {
     case 'LOAD':
       return { ...INITIAL_STATE, ...action.payload };
+
+    case 'ADD_SNAPSHOT':
+      return { ...state, snapshots: [...(state.snapshots || []), action.payload] };
 
     case 'ADD_EXPENSE':
       return { ...state, expenses: [...state.expenses, { ...action.payload, id: Date.now() }] };
@@ -79,34 +149,35 @@ export function AppProvider({ children }) {
   const [syncing, setSyncing] = useState(false);
   const [initialized, setInitialized] = useState(false);
 
-  // Load from Firestore on mount, fall back to localStorage
   useEffect(() => {
     async function load() {
+      let data = null;
       try {
         const snap = await getDoc(DOC_REF);
         if (snap.exists()) {
-          dispatch({ type: 'LOAD', payload: snap.data() });
+          data = snap.data();
         } else {
-          // First time on Firestore — migrate localStorage data if any
           const local = localStorage.getItem('investTrackData');
-          if (local) {
-            const parsed = JSON.parse(local);
-            dispatch({ type: 'LOAD', payload: parsed });
-          }
+          if (local) data = JSON.parse(local);
         }
       } catch {
-        // Offline or error — fall back to localStorage
         const local = localStorage.getItem('investTrackData');
-        if (local) dispatch({ type: 'LOAD', payload: JSON.parse(local) });
-      } finally {
-        setLoading(false);
-        setInitialized(true);
+        if (local) data = JSON.parse(local);
       }
+
+      if (data) {
+        dispatch({ type: 'LOAD', payload: data });
+        if (isSnapshotDue(data.snapshots || [])) {
+          dispatch({ type: 'ADD_SNAPSHOT', payload: buildSnapshot(data) });
+        }
+      }
+
+      setLoading(false);
+      setInitialized(true);
     }
     load();
   }, []);
 
-  // Save to Firestore + localStorage whenever state changes (after initial load)
   useEffect(() => {
     if (!initialized) return;
     localStorage.setItem('investTrackData', JSON.stringify(state));

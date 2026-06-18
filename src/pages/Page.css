@@ -163,6 +163,13 @@
   padding: 20px 24px;
 }
 
+.history-chart-title {
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  margin-bottom: 12px;
+}
+
 .filter-bar {
   display: flex;
   gap: 10px;

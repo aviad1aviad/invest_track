@@ -2,9 +2,10 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import InsightsCard from '../components/common/InsightsCard';
 import { getSavingsInsights } from '../utils/insights';
+import HistoryChartModal from '../components/common/HistoryChartModal';
 import './Page.css';
 import './Savings.css';
 
@@ -34,6 +35,7 @@ export default function Savings() {
   const [form, setForm] = useState(EMPTY_FORM);
   const [filterType, setFilterType] = useState('');
   const [filterCompany, setFilterCompany] = useState('');
+  const [chartSaving, setChartSaving] = useState(null);
 
   const openAdd = () => { setEditing(null); setForm(EMPTY_FORM); setShowModal(true); };
   const openEdit = s => { setEditing(s); setForm({ ...s }); setShowModal(true); };
@@ -82,6 +84,18 @@ export default function Savings() {
 
   const filteredTotal = filteredSavings.reduce((s, sv) => s + (Number(sv.currentAmount) || 0), 0);
 
+  const snapshots = state.snapshots || [];
+  const hasTotalHistory = snapshots.length >= 2;
+
+  const getSavingChartData = (saving) =>
+    snapshots
+      .map(snap => {
+        const d = (snap.savingsDetail || []).find(s => s.id === saving.id);
+        if (!d) return null;
+        return { date: snap.date, value: d.amount, deposits: d.deposits };
+      })
+      .filter(Boolean);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -119,6 +133,22 @@ export default function Savings() {
           </div>
         )}
       </div>
+
+      {/* Historical total chart */}
+      {hasTotalHistory && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="history-chart-title">צמיחת חסכונות לאורך זמן</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={snapshots} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={v => `₪${fmt(v)}`} tick={{ fontSize: 11 }} width={88} />
+              <Tooltip formatter={v => `₪${fmt(v)}`} />
+              <Line type="monotone" dataKey="totalSavings" name="חסכונות" stroke="#4361ee" strokeWidth={2.5} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {state.savings.length > 0 && (
         <InsightsCard insights={getSavingsInsights(state.savings)} />
@@ -177,6 +207,7 @@ export default function Savings() {
                     <td className="num">{pct(s.depositFee)}</td>
                     <td className="num">{pct(s.accumulationFee)}</td>
                     <td className="actions-cell">
+                      <button className="icon-btn" title="היסטוריה" onClick={() => setChartSaving(s)}>📈</button>
                       <button className="icon-btn" onClick={() => openEdit(s)}>✏️</button>
                       <button className="icon-btn" onClick={() => handleDelete(s.id)}>🗑️</button>
                     </td>
@@ -220,6 +251,7 @@ export default function Savings() {
                 <span className="mcard-name">{s.name}</span>
                 {s.type && <span className="badge">{s.type}</span>}
                 <div className="mcard-actions">
+                  <button className="icon-btn" title="היסטוריה" onClick={() => setChartSaving(s)}>📈</button>
                   <button className="icon-btn" onClick={() => openEdit(s)}>✏️</button>
                   <button className="icon-btn" onClick={() => handleDelete(s.id)}>🗑️</button>
                 </div>
@@ -293,6 +325,14 @@ export default function Savings() {
             <FormActions onCancel={closeModal} submitLabel={editing ? 'עדכן' : 'הוסף'} />
           </form>
         </Modal>
+      )}
+
+      {chartSaving && (
+        <HistoryChartModal
+          name={chartSaving.name}
+          data={getSavingChartData(chartSaving)}
+          onClose={() => setChartSaving(null)}
+        />
       )}
     </div>
   );

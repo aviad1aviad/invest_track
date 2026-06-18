@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid } from 'recharts';
 import InsightsCard from '../components/common/InsightsCard';
 import { getInvestmentInsights } from '../utils/insights';
 import { getCurrentRate, getHistoricalRate } from '../utils/exchangeRate';
+import HistoryChartModal from '../components/common/HistoryChartModal';
 import './Page.css';
 import './Investments.css';
 
@@ -128,6 +129,7 @@ export default function Investments() {
   const [rateError, setRateError] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterHouse, setFilterHouse] = useState('');
+  const [chartInvestment, setChartInvestment] = useState(null);
 
   const openAdd = () => {
     setEditing(null);
@@ -230,6 +232,18 @@ export default function Investments() {
   const filteredProfit = filteredCurrentValue - filteredValuedDeposits;
   const filteredReturn = filteredValuedDeposits > 0 ? (filteredProfit / filteredValuedDeposits) * 100 : null;
 
+  const snapshots = state.snapshots || [];
+  const hasTotalHistory = snapshots.length >= 2;
+
+  const getInvChartData = (inv) =>
+    snapshots
+      .map(snap => {
+        const d = (snap.investmentsDetail || []).find(i => i.id === inv.id);
+        if (!d) return null;
+        return { date: snap.date, value: d.valueILS, deposits: d.deposits };
+      })
+      .filter(Boolean);
+
   const isSecurity = form.entryType === 'security';
   const isUSD = form.currency === 'USD';
 
@@ -298,6 +312,22 @@ export default function Investments() {
         <InsightsCard insights={getInvestmentInsights(state.investments, calcCurrentValue)} />
       )}
 
+      {/* Historical total chart */}
+      {hasTotalHistory && (
+        <div className="card" style={{ marginBottom: 16 }}>
+          <div className="history-chart-title">צמיחת תיק השקעות לאורך זמן</div>
+          <ResponsiveContainer width="100%" height={200}>
+            <LineChart data={snapshots} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={v => `₪${fmt(v)}`} tick={{ fontSize: 11 }} width={88} />
+              <Tooltip formatter={v => `₪${fmt(v)}`} />
+              <Line type="monotone" dataKey="totalInvestments" name="השקעות" stroke="#f7932a" strokeWidth={2.5} dot={{ r: 3 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+
       {(uniqueTypes.length > 1 || uniqueHouses.length > 1) && (
         <div className="filter-bar">
           {uniqueTypes.length > 1 && (
@@ -359,6 +389,7 @@ export default function Investments() {
                     <td className="num">{portPct !== null ? `${portPct}%` : '—'}</td>
                     <td className="num">{pct(inv.accumulationFee)}</td>
                     <td className="actions-cell">
+                      <button className="icon-btn" title="היסטוריה" onClick={() => setChartInvestment(inv)}>📈</button>
                       <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>
                       <button className="icon-btn" onClick={() => handleDelete(inv.id)}>🗑️</button>
                     </td>
@@ -408,6 +439,7 @@ export default function Investments() {
                 {inv.securityNumber && <span className="ticker-badge">{inv.securityNumber}</span>}
                 {inv.type && <span className="badge inv-badge">{inv.type}</span>}
                 <div className="mcard-actions">
+                  <button className="icon-btn" title="היסטוריה" onClick={() => setChartInvestment(inv)}>📈</button>
                   <button className="icon-btn" onClick={() => openEdit(inv)}>✏️</button>
                   <button className="icon-btn" onClick={() => handleDelete(inv.id)}>🗑️</button>
                 </div>
@@ -447,6 +479,14 @@ export default function Investments() {
           </div>
         )}
       </div>
+
+      {chartInvestment && (
+        <HistoryChartModal
+          name={chartInvestment.name}
+          data={getInvChartData(chartInvestment)}
+          onClose={() => setChartInvestment(null)}
+        />
+      )}
 
       {/* Modal */}
       {showModal && (

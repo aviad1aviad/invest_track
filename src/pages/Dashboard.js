@@ -1,6 +1,6 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend } from 'recharts';
 import InsightsCard from '../components/common/InsightsCard';
 import { getDashboardInsights } from '../utils/insights';
 import './Page.css';
@@ -180,6 +180,25 @@ export default function Dashboard() {
       </div>
 
       <InsightsCard insights={getDashboardInsights(state)} />
+
+      {/* Historical growth chart */}
+      {(state.snapshots || []).length >= 2 && (
+        <div className="card dash-section">
+          <SectionTitle>צמיחת נכסים לאורך זמן</SectionTitle>
+          <ResponsiveContainer width="100%" height={240}>
+            <LineChart data={state.snapshots} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
+              <XAxis dataKey="date" tick={{ fontSize: 11 }} />
+              <YAxis tickFormatter={v => `₪${fmt(v)}`} tick={{ fontSize: 11 }} width={80} />
+              <Tooltip formatter={(v, name) => [`₪${fmt(v)}`, name]} />
+              <Legend />
+              <Line type="monotone" dataKey="grandTotal" name='סה"כ נכסים' stroke="#4361ee" strokeWidth={2.5} dot={{ r: 3 }} />
+              <Line type="monotone" dataKey="totalSavings" name="חסכונות" stroke="#3ecf8e" strokeWidth={1.5} dot={{ r: 2 }} />
+              <Line type="monotone" dataKey="totalInvestments" name="השקעות" stroke="#f7932a" strokeWidth={1.5} dot={{ r: 2 }} />
+            </LineChart>
+          </ResponsiveContainer>
+        </div>
+      )}
 
       {/* Global allocation */}
       {globalPieData.length > 0 && (
