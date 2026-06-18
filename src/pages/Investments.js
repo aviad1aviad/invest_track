@@ -278,7 +278,7 @@ export default function Investments() {
         }});
       } else {
         const { existing: _e, action: _a, ...cleanItem } = item;
-        dispatch({ type: 'ADD_INVESTMENT', payload: cleanItem });
+        dispatch({ type: 'ADD_INVESTMENT', payload: { ...cleanItem, id: cleanItem.securityNumber } });
       }
     });
     setPsagotPreview(null);

@@ -101,21 +101,21 @@ function reducer(state, action) {
       return { ...state, snapshots: [...(state.snapshots || []), action.payload] };
 
     case 'ADD_EXPENSE':
-      return { ...state, expenses: [...state.expenses, { ...action.payload, id: Date.now() }] };
+      return { ...state, expenses: [...state.expenses, { ...action.payload, id: Date.now() + Math.random() }] };
     case 'UPDATE_EXPENSE':
       return { ...state, expenses: state.expenses.map(e => e.id === action.payload.id ? action.payload : e) };
     case 'DELETE_EXPENSE':
       return { ...state, expenses: state.expenses.filter(e => e.id !== action.payload) };
 
     case 'ADD_SAVING':
-      return { ...state, savings: [...state.savings, { ...action.payload, id: Date.now() }] };
+      return { ...state, savings: [...state.savings, { ...action.payload, id: Date.now() + Math.random() }] };
     case 'UPDATE_SAVING':
       return { ...state, savings: state.savings.map(s => s.id === action.payload.id ? action.payload : s) };
     case 'DELETE_SAVING':
       return { ...state, savings: state.savings.filter(s => s.id !== action.payload) };
 
     case 'ADD_INVESTMENT':
-      return { ...state, investments: [...state.investments, { ...action.payload, id: Date.now() }] };
+      return { ...state, investments: [...state.investments, { ...action.payload, id: action.payload.id ?? Date.now() + Math.random() }] };
     case 'UPDATE_INVESTMENT':
       return { ...state, investments: state.investments.map(i => i.id === action.payload.id ? action.payload : i) };
     case 'DELETE_INVESTMENT':
@@ -126,7 +126,7 @@ function reducer(state, action) {
         ...state,
         investments: state.investments.map(inv =>
           inv.id === investmentId
-            ? { ...inv, lots: [...(inv.lots || []), { ...lot, id: Date.now() }] }
+            ? { ...inv, lots: [...(inv.lots || []), { ...lot, id: Date.now() + Math.random() }] }
             : inv
         ),
       };
@@ -144,7 +144,7 @@ function reducer(state, action) {
     }
 
     case 'ADD_INCOME':
-      return { ...state, incomes: [...state.incomes, { ...action.payload, id: Date.now() }] };
+      return { ...state, incomes: [...state.incomes, { ...action.payload, id: Date.now() + Math.random() }] };
     case 'UPDATE_INCOME':
       return { ...state, incomes: state.incomes.map(i => i.id === action.payload.id ? action.payload : i) };
     case 'DELETE_INCOME':
