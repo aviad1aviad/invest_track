@@ -79,6 +79,7 @@ function parsePsagotExcel(file) {
             investmentHouse: 'פסגות טרייד',
             entryType: 'security',
             currency: 'ILS',
+            accumulationFee: 0,
           }));
 
         // Merge duplicate securities (same security in multiple Psagot accounts)
@@ -457,7 +458,7 @@ export default function Investments() {
               <tr>
                 <th>שם</th><th>מסלול</th><th>בית השקעות</th><th>מס' נייר</th>
                 <th>שווי עדכני</th><th>סה"כ הפקדות</th><th>רווח</th><th>תשואה</th>
-                <th>% מהתיק</th><th>נכון לתאריך</th><th>דמי ניהול</th><th></th>
+                <th>נכון לתאריך</th><th>דמי ניהול</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -468,8 +469,6 @@ export default function Investments() {
                 const deposits = getDeposits(inv);
                 const profit = currentVal !== null ? currentVal - deposits : null;
                 const ret = deposits && profit !== null ? (profit / deposits) * 100 : null;
-                const portPct = currentVal !== null && totalCurrentValue > 0
-                  ? ((currentVal / totalCurrentValue) * 100).toFixed(1) : null;
                 return (
                   <tr key={inv.id}>
                     <td>
@@ -487,7 +486,6 @@ export default function Investments() {
                     <td className="num">₪{fmt(deposits)}</td>
                     <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>{profit !== null ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}</td>
                     <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>{ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}</td>
-                    <td className="num">{portPct !== null ? `${portPct}%` : '—'}</td>
                     <td>{fmtDate(inv.lastUpdated)}</td>
                     <td className="num">{pct(inv.accumulationFee)}</td>
                     <td className="actions-cell">
@@ -507,7 +505,7 @@ export default function Investments() {
                   <td className="num"><strong>₪{fmt(filteredDeposits)}</strong></td>
                   <td className={filteredProfit >= 0 ? 'positive' : 'negative'}><strong>{filteredValuedDeposits > 0 ? `${filteredProfit >= 0 ? '+' : ''}₪${fmt(filteredProfit)}` : '—'}</strong></td>
                   <td className={filteredReturn !== null && filteredReturn >= 0 ? 'positive' : 'negative'}><strong>{filteredReturn !== null ? `${filteredReturn >= 0 ? '+' : ''}${fmtDec(filteredReturn)}%` : '—'}</strong></td>
-                  <td colSpan={4} />
+                  <td colSpan={3} />
                 </tr>
               </tfoot>
             )}
