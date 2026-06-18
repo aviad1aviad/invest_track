@@ -87,7 +87,22 @@ function parsePsagotExcel(file) {
             entryType: 'security',
             currency: 'ILS',
           }));
-        resolve(parsed);
+
+        // Merge duplicate securities (same security in multiple Psagot accounts)
+        const dedupMap = new Map();
+        parsed.forEach(item => {
+          if (dedupMap.has(item.securityNumber)) {
+            const prev = dedupMap.get(item.securityNumber);
+            dedupMap.set(item.securityNumber, {
+              ...item,
+              unitCount: prev.unitCount + item.unitCount,
+              totalDeposits: prev.totalDeposits + item.totalDeposits,
+            });
+          } else {
+            dedupMap.set(item.securityNumber, item);
+          }
+        });
+        resolve(Array.from(dedupMap.values()));
       } catch (err) {
         reject(err);
       }
@@ -243,7 +258,7 @@ export default function Investments() {
     try {
       const parsed = await parsePsagotExcel(file);
       const preview = parsed.map(item => {
-        const existing = state.investments.find(inv => inv.securityNumber === item.securityNumber);
+        const existing = state.investments.find(inv => String(inv.securityNumber) === String(item.securityNumber));
         return { ...item, existing, action: existing ? 'update' : 'add' };
       });
       setPsagotPreview(preview);
@@ -262,7 +277,8 @@ export default function Investments() {
           totalDeposits: item.totalDeposits,
         }});
       } else {
-        dispatch({ type: 'ADD_INVESTMENT', payload: item });
+        const { existing: _e, action: _a, ...cleanItem } = item;
+        dispatch({ type: 'ADD_INVESTMENT', payload: cleanItem });
       }
     });
     setPsagotPreview(null);
