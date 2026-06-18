@@ -62,7 +62,7 @@ function PieLegend({ data, total, showProfitCol = false, profitMap = {} }) {
 }
 
 export default function Dashboard() {
-  const { state } = useApp();
+  const { state, dispatch } = useApp();
 
   const totalExpenses = state.expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const totalIncomes = (state.incomes || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
@@ -132,6 +132,9 @@ export default function Dashboard() {
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">דשבורד</h1>
+        <button className="btn btn-secondary" onClick={() => dispatch({ type: 'TAKE_SNAPSHOT' })}>
+          📸 צלם snapshot
+        </button>
       </div>
 
       {/* KPI cards */}

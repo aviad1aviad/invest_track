@@ -81,7 +81,7 @@ function isSnapshotDue(snapshots) {
 
   const lastScheduled = day >= 20
     ? new Date(year, month, 20)
-    : new Date(year, month, 1);
+    : new Date(year, month - 1, 20);
   lastScheduled.setHours(0, 0, 0, 0);
 
   if (!snapshots || snapshots.length === 0) return true;
@@ -99,6 +99,13 @@ function reducer(state, action) {
 
     case 'ADD_SNAPSHOT':
       return { ...state, snapshots: [...(state.snapshots || []), action.payload] };
+
+    case 'TAKE_SNAPSHOT': {
+      const snap = buildSnapshot(state);
+      const already = (state.snapshots || []).some(s => s.date === snap.date);
+      if (already) return state;
+      return { ...state, snapshots: [...(state.snapshots || []), snap] };
+    }
 
     case 'ADD_EXPENSE':
       return { ...state, expenses: [...state.expenses, { ...action.payload, id: Date.now() + Math.random() }] };

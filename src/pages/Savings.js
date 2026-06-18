@@ -20,6 +20,11 @@ const EMPTY_FORM = {
 function fmt(n) { return Number(n).toLocaleString('he-IL'); }
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function pct(n) { return n !== '' && n !== undefined ? `${Number(n).toFixed(2)}%` : '—'; }
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
 
 function calcReturn(s) {
   const current = Number(s.currentAmount) || 0;
@@ -46,6 +51,7 @@ export default function Savings() {
     e.preventDefault();
     const payload = {
       ...form,
+      lastUpdated: new Date().toISOString().slice(0, 10),
       currentAmount: Number(form.currentAmount),
       totalDeposits: Number(form.totalDeposits),
       depositFee: Number(form.depositFee),
@@ -182,7 +188,7 @@ export default function Savings() {
               <tr>
                 <th>שם קרן</th><th>מסלול</th><th>חברה מנהלת</th><th>מס' קופה</th>
                 <th>סכום עדכני</th><th>סה"כ הפקדות</th><th>רווח</th><th>תשואה</th>
-                <th>% מהתיק</th><th>דמי ניהול הפקדה</th><th>דמי ניהול צבירה</th><th></th>
+                <th>% מהתיק</th><th>נכון לתאריך</th><th>דמי ניהול הפקדה</th><th>דמי ניהול צבירה</th><th></th>
               </tr>
             </thead>
             <tbody>
@@ -204,6 +210,7 @@ export default function Savings() {
                       {ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}
                     </td>
                     <td className="num">{total > 0 ? ((s.currentAmount / total) * 100).toFixed(1) : 0}%</td>
+                    <td>{fmtDate(s.lastUpdated)}</td>
                     <td className="num">{pct(s.depositFee)}</td>
                     <td className="num">{pct(s.accumulationFee)}</td>
                     <td className="actions-cell">
@@ -220,7 +227,7 @@ export default function Savings() {
                 <tr className="total-row">
                   <td colSpan={4}><strong>סה"כ{(filterType || filterCompany) ? ' (מסונן)' : ''}</strong></td>
                   <td className="num"><strong>₪{fmt(filteredTotal)}</strong></td>
-                  <td colSpan={7} />
+                  <td colSpan={8} />
                 </tr>
               </tfoot>
             )}

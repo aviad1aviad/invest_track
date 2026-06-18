@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
@@ -25,6 +25,11 @@ const EMPTY_FORM = {
 };
 
 function fmt(n) { return Math.round(Number(n)).toLocaleString('he-IL'); }
+function fmtDate(d) {
+  if (!d) return '—';
+  const [y, m, day] = d.split('-');
+  return `${day}/${m}/${y}`;
+}
 function fmtDec(n, d = 2) { return Number(n).toLocaleString('he-IL', { minimumFractionDigits: d, maximumFractionDigits: d }); }
 function pct(n) { return n !== '' && n !== undefined && n !== 0 ? `${Number(n).toFixed(3)}%` : '—'; }
 
@@ -177,6 +182,11 @@ export default function Investments() {
   const [rateError, setRateError] = useState('');
   const [filterType, setFilterType] = useState('');
   const [filterHouse, setFilterHouse] = useState('');
+  const [liveRate, setLiveRate] = useState(null);
+
+  useEffect(() => {
+    getCurrentRate().then(setLiveRate).catch(() => {});
+  }, []);
   const [chartInvestment, setChartInvestment] = useState(null);
   const [psagotPreview, setPsagotPreview] = useState(null);
   const psagotRef = useRef();
@@ -191,7 +201,12 @@ export default function Investments() {
 
   const openEdit = inv => {
     setEditing(inv);
-    setForm({ entryType: inv.entryType || 'security', currency: inv.currency || 'ILS', ...inv });
+    setForm({
+      entryType: inv.entryType || 'security',
+      currency: inv.currency || 'ILS',
+      ...inv,
+      ...(inv.currency === 'USD' && liveRate ? { currentExchangeRate: liveRate } : {}),
+    });
     setPendingLots(inv.lots || []);
     setRateError('');
     setShowModal(true);
@@ -225,6 +240,7 @@ export default function Investments() {
     const isUSD = form.currency === 'USD';
     const payload = {
       ...form,
+      lastUpdated: new Date().toISOString().slice(0, 10),
       lots: isUSD ? pendingLots : [],
       totalDeposits: isUSD
         ? pendingLots.reduce((s, l) => s + (Number(l.amountILS) || 0), 0)
@@ -269,25 +285,35 @@ export default function Investments() {
 
   const confirmPsagotImport = () => {
     psagotPreview.forEach(item => {
+      const today = new Date().toISOString().slice(0, 10);
       if (item.action === 'update') {
         dispatch({ type: 'UPDATE_INVESTMENT', payload: {
           ...item.existing,
           unitCount: item.unitCount,
           unitPriceAgorot: item.unitPriceAgorot,
           totalDeposits: item.totalDeposits,
+          lastUpdated: today,
         }});
       } else {
         const { existing: _e, action: _a, ...cleanItem } = item;
-        dispatch({ type: 'ADD_INVESTMENT', payload: { ...cleanItem, id: cleanItem.securityNumber } });
+        dispatch({ type: 'ADD_INVESTMENT', payload: { ...cleanItem, id: cleanItem.securityNumber, lastUpdated: today } });
       }
     });
     setPsagotPreview(null);
   };
 
-  const totalCurrentValue = state.investments.reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0);
+  const liveCalc = inv => {
+    if (inv.currency === 'USD' && liveRate) {
+      const usd = Number(inv.currentValueUSD) || 0;
+      return usd ? usd * liveRate : null;
+    }
+    return calcCurrentValue(inv);
+  };
+
+  const totalCurrentValue = state.investments.reduce((s, inv) => s + (liveCalc(inv) ?? 0), 0);
   const totalDepositsAll = state.investments.reduce((s, inv) => s + getDeposits(inv), 0);
   const valuedDeposits = state.investments
-    .filter(inv => calcCurrentValue(inv) !== null)
+    .filter(inv => liveCalc(inv) !== null)
     .reduce((s, inv) => s + getDeposits(inv), 0);
   const totalProfit = totalCurrentValue - valuedDeposits;
   const totalReturn = valuedDeposits > 0 ? (totalProfit / valuedDeposits) * 100 : null;
@@ -295,7 +321,7 @@ export default function Investments() {
   const allTypes = [...new Set(state.investments.map(inv => inv.type).filter(Boolean))];
   const pieData = allTypes.map((t, i) => ({
     name: t,
-    value: state.investments.filter(inv => inv.type === t).reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0),
+    value: state.investments.filter(inv => inv.type === t).reduce((s, inv) => s + (liveCalc(inv) ?? 0), 0),
     color: COLORS[i % COLORS.length],
   })).filter(d => d.value > 0).sort((a, b) => b.value - a.value);
 
@@ -309,9 +335,9 @@ export default function Investments() {
     (!filterHouse || inv.investmentHouse === filterHouse)
   );
 
-  const filteredCurrentValue = filteredInvestments.reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0);
+  const filteredCurrentValue = filteredInvestments.reduce((s, inv) => s + (liveCalc(inv) ?? 0), 0);
   const filteredDeposits = filteredInvestments.reduce((s, inv) => s + getDeposits(inv), 0);
-  const filteredValuedDeposits = filteredInvestments.filter(inv => calcCurrentValue(inv) !== null).reduce((s, inv) => s + getDeposits(inv), 0);
+  const filteredValuedDeposits = filteredInvestments.filter(inv => liveCalc(inv) !== null).reduce((s, inv) => s + getDeposits(inv), 0);
   const filteredProfit = filteredCurrentValue - filteredValuedDeposits;
   const filteredReturn = filteredValuedDeposits > 0 ? (filteredProfit / filteredValuedDeposits) * 100 : null;
 
@@ -443,17 +469,17 @@ export default function Investments() {
               <tr>
                 <th>שם</th><th>מסלול</th><th>בית השקעות</th><th>מס' נייר</th>
                 <th>שווי עדכני</th><th>סה"כ הפקדות</th><th>רווח</th><th>תשואה</th>
-                <th>% מהתיק</th><th>דמי ניהול</th><th></th>
+                <th>% מהתיק</th><th>נכון לתאריך</th><th>דמי ניהול</th><th></th>
               </tr>
             </thead>
             <tbody>
               {filteredInvestments.map(inv => {
                 const isProvident = inv.entryType === 'provident';
                 const isUSDInv = inv.currency === 'USD';
-                const currentVal = calcCurrentValue(inv);
+                const currentVal = liveCalc(inv);
                 const deposits = getDeposits(inv);
-                const profit = calcProfit(inv);
-                const ret = calcReturn(inv);
+                const profit = currentVal !== null ? currentVal - deposits : null;
+                const ret = deposits && profit !== null ? (profit / deposits) * 100 : null;
                 const portPct = currentVal !== null && totalCurrentValue > 0
                   ? ((currentVal / totalCurrentValue) * 100).toFixed(1) : null;
                 return (
@@ -474,6 +500,7 @@ export default function Investments() {
                     <td className={profit !== null ? (profit >= 0 ? 'positive' : 'negative') : ''}>{profit !== null ? `${profit >= 0 ? '+' : ''}₪${fmt(profit)}` : '—'}</td>
                     <td className={ret !== null ? (ret >= 0 ? 'positive' : 'negative') : ''}>{ret !== null ? `${ret >= 0 ? '+' : ''}${fmtDec(ret)}%` : '—'}</td>
                     <td className="num">{portPct !== null ? `${portPct}%` : '—'}</td>
+                    <td>{fmtDate(inv.lastUpdated)}</td>
                     <td className="num">{pct(inv.accumulationFee)}</td>
                     <td className="actions-cell">
                       <button className="icon-btn" title="היסטוריה" onClick={() => setChartInvestment(inv)}>📈</button>
@@ -492,7 +519,7 @@ export default function Investments() {
                   <td className="num"><strong>₪{fmt(filteredDeposits)}</strong></td>
                   <td className={filteredProfit >= 0 ? 'positive' : 'negative'}><strong>{filteredValuedDeposits > 0 ? `${filteredProfit >= 0 ? '+' : ''}₪${fmt(filteredProfit)}` : '—'}</strong></td>
                   <td className={filteredReturn !== null && filteredReturn >= 0 ? 'positive' : 'negative'}><strong>{filteredReturn !== null ? `${filteredReturn >= 0 ? '+' : ''}${fmtDec(filteredReturn)}%` : '—'}</strong></td>
-                  <td colSpan={3} />
+                  <td colSpan={4} />
                 </tr>
               </tfoot>
             )}
@@ -511,10 +538,10 @@ export default function Investments() {
         {filteredInvestments.map(inv => {
           const isProvident = inv.entryType === 'provident';
           const isUSDInv = inv.currency === 'USD';
-          const currentVal = calcCurrentValue(inv);
+          const currentVal = liveCalc(inv);
           const deposits = getDeposits(inv);
-          const profit = calcProfit(inv);
-          const ret = calcReturn(inv);
+          const profit = currentVal !== null ? currentVal - deposits : null;
+          const ret = deposits && profit !== null ? (profit / deposits) * 100 : null;
           return (
             <div key={inv.id} className="mcard">
               <div className="mcard-header">
