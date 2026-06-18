@@ -14,6 +14,18 @@ const INITIAL_STATE = {
 
 const DOC_REF = doc(db, 'userData', 'main');
 
+function sanitize(val) {
+  if (Array.isArray(val)) return val.map(sanitize);
+  if (val !== null && typeof val === 'object') {
+    return Object.fromEntries(
+      Object.entries(val)
+        .filter(([, v]) => v !== undefined)
+        .map(([k, v]) => [k, sanitize(v)])
+    );
+  }
+  return val;
+}
+
 function calcInvValue(inv) {
   if (inv.currency === 'USD') {
     const usd = Number(inv.currentValueUSD) || 0;
@@ -182,7 +194,7 @@ export function AppProvider({ children }) {
     if (!initialized) return;
     localStorage.setItem('investTrackData', JSON.stringify(state));
     setSyncing(true);
-    setDoc(DOC_REF, state)
+    setDoc(DOC_REF, sanitize(state))
       .catch(() => {})
       .finally(() => setSyncing(false));
   }, [state, initialized]);

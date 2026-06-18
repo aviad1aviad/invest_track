@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
@@ -7,6 +7,7 @@ import InsightsCard from '../components/common/InsightsCard';
 import { getInvestmentInsights } from '../utils/insights';
 import { getCurrentRate, getHistoricalRate } from '../utils/exchangeRate';
 import HistoryChartModal from '../components/common/HistoryChartModal';
+import * as XLSX from 'xlsx';
 import './Page.css';
 import './Investments.css';
 
@@ -61,6 +62,38 @@ function calcReturn(inv) {
   const profit = calcProfit(inv);
   if (!deposits || profit === null) return null;
   return (profit / deposits) * 100;
+}
+
+function parsePsagotExcel(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => {
+      try {
+        const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
+        const ws = wb.Sheets[wb.SheetNames[0]];
+        const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        const header = rows[0];
+        const col = name => header.indexOf(name);
+
+        const parsed = rows.slice(1)
+          .filter(r => r[col('שם')] && r[col('סימבול')])
+          .map(r => ({
+            name: String(r[col('שם')]),
+            securityNumber: String(r[col('סימבול')]),
+            unitCount: Number(r[col('כמות')]) || 0,
+            unitPriceAgorot: Number(r[col('שער אחרון')]) || 0,
+            totalDeposits: Math.round(Number(r[col('שווי כולל')]) - Number(r[col('רווח/הפסד כולל')])),
+            investmentHouse: 'פסגות טרייד',
+            entryType: 'security',
+            currency: 'ILS',
+          }));
+        resolve(parsed);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.readAsArrayBuffer(file);
+  });
 }
 
 // ── Lot row component ──────────────────────────────────────────────────────────
@@ -130,6 +163,8 @@ export default function Investments() {
   const [filterType, setFilterType] = useState('');
   const [filterHouse, setFilterHouse] = useState('');
   const [chartInvestment, setChartInvestment] = useState(null);
+  const [psagotPreview, setPsagotPreview] = useState(null);
+  const psagotRef = useRef();
 
   const openAdd = () => {
     setEditing(null);
@@ -201,6 +236,38 @@ export default function Investments() {
     if (window.confirm('למחוק השקעה זו?')) dispatch({ type: 'DELETE_INVESTMENT', payload: id });
   };
 
+  const handlePsagotFile = async e => {
+    const file = e.target.files[0];
+    if (!file) return;
+    e.target.value = '';
+    try {
+      const parsed = await parsePsagotExcel(file);
+      const preview = parsed.map(item => {
+        const existing = state.investments.find(inv => inv.securityNumber === item.securityNumber);
+        return { ...item, existing, action: existing ? 'update' : 'add' };
+      });
+      setPsagotPreview(preview);
+    } catch {
+      alert('שגיאה בקריאת הקובץ');
+    }
+  };
+
+  const confirmPsagotImport = () => {
+    psagotPreview.forEach(item => {
+      if (item.action === 'update') {
+        dispatch({ type: 'UPDATE_INVESTMENT', payload: {
+          ...item.existing,
+          unitCount: item.unitCount,
+          unitPriceAgorot: item.unitPriceAgorot,
+          totalDeposits: item.totalDeposits,
+        }});
+      } else {
+        dispatch({ type: 'ADD_INVESTMENT', payload: item });
+      }
+    });
+    setPsagotPreview(null);
+  };
+
   const totalCurrentValue = state.investments.reduce((s, inv) => s + (calcCurrentValue(inv) ?? 0), 0);
   const totalDepositsAll = state.investments.reduce((s, inv) => s + getDeposits(inv), 0);
   const valuedDeposits = state.investments
@@ -256,7 +323,11 @@ export default function Investments() {
     <div className="page">
       <div className="page-header">
         <h1 className="page-title">השקעות</h1>
-        <button className="btn btn-primary" onClick={openAdd}>+ השקעה חדשה</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button className="btn btn-secondary" onClick={() => psagotRef.current.click()}>📥 ייבוא פסגות</button>
+          <button className="btn btn-primary" onClick={openAdd}>+ השקעה חדשה</button>
+        </div>
+        <input ref={psagotRef} type="file" accept=".xlsx,.xls" onChange={handlePsagotFile} style={{ display: 'none' }} />
       </div>
 
       <div className="inv-overview">
@@ -479,6 +550,42 @@ export default function Investments() {
           </div>
         )}
       </div>
+
+      {psagotPreview && (
+        <Modal title="ייבוא מפסגות טרייד — תצוגה מקדימה" onClose={() => setPsagotPreview(null)}>
+          <div className="psagot-preview">
+            <p className="psagot-summary">
+              <span className="psagot-badge update">{psagotPreview.filter(i => i.action === 'update').length} יתעדכנו</span>
+              <span className="psagot-badge add">{psagotPreview.filter(i => i.action === 'add').length} יתווספו</span>
+            </p>
+            <div className="psagot-table-wrap">
+              <table className="data-table">
+                <thead>
+                  <tr><th>שם</th><th>סימבול</th><th>כמות</th><th>שווי עדכני</th><th>פעולה</th></tr>
+                </thead>
+                <tbody>
+                  {psagotPreview.map((item, i) => (
+                    <tr key={i}>
+                      <td>{item.name}</td>
+                      <td><span className="ticker-badge">{item.securityNumber}</span></td>
+                      <td className="num">{item.unitCount.toLocaleString('he-IL')}</td>
+                      <td className="num">₪{fmt(item.unitCount * item.unitPriceAgorot / 100)}</td>
+                      <td>{item.action === 'update'
+                        ? <span className="psagot-badge update">עדכון</span>
+                        : <span className="psagot-badge add">חדש</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="psagot-actions">
+              <button className="btn btn-primary" onClick={confirmPsagotImport}>אישור ייבוא</button>
+              <button className="btn btn-secondary" onClick={() => setPsagotPreview(null)}>ביטול</button>
+            </div>
+          </div>
+        </Modal>
+      )}
 
       {chartInvestment && (
         <HistoryChartModal
