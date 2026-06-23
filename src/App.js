@@ -5,15 +5,17 @@ import Expenses from './pages/Expenses';
 import Savings from './pages/Savings';
 import Investments from './pages/Investments';
 import Incomes from './pages/Incomes';
+import CreditTracker from './pages/CreditTracker';
 import * as XLSX from 'xlsx';
 import './App.css';
 
 const TABS = [
   { id: 'dashboard', label: 'דשבורד', icon: '📊' },
   { id: 'incomes', label: 'הכנסות', icon: '💰' },
-  { id: 'expenses', label: 'הוצאות', icon: '💳' },
+  { id: 'expenses', label: 'הוצאות', icon: '🧾' },
   { id: 'savings', label: 'חסכונות', icon: '🏦' },
   { id: 'investments', label: 'השקעות', icon: '📈' },
+  { id: 'credit', label: 'הוצאות אשראי', icon: '💳' },
 ];
 
 function SyncIndicator() {
@@ -167,6 +169,7 @@ function AppInner() {
       case 'expenses': return <Expenses />;
       case 'savings': return <Savings />;
       case 'investments': return <Investments />;
+      case 'credit': return <CreditTracker />;
       default: return <Dashboard />;
     }
   };

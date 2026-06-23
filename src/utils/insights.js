@@ -29,7 +29,7 @@ export function getExpenseInsights(expenses) {
 
   const total = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const foodTotal = expenses.filter(e => e.domain === 'אוכל').reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const savingsTotal = expenses.filter(e => e.domain === 'תיק השקעות').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const savingsTotal = expenses.filter(e => e.domain === 'חיסכון').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const baseTotal = total - foodTotal - savingsTotal;
 
   // Duplicate detection
@@ -47,7 +47,7 @@ export function getExpenseInsights(expenses) {
 
   // Domain concentration (excluding savings & food)
   const domainMap = {};
-  expenses.filter(e => e.domain !== 'תיק השקעות' && e.domain !== 'אוכל').forEach(e => {
+  expenses.filter(e => e.domain !== 'חיסכון' && e.domain !== 'אוכל').forEach(e => {
     domainMap[e.domain] = (domainMap[e.domain] || 0) + (Number(e.amount) || 0);
   });
   if (baseTotal > 0) {
@@ -66,7 +66,7 @@ export function getExpenseInsights(expenses) {
 
   // No savings domain
   if (savingsTotal === 0) {
-    insights.push({ level: 'warning', text: 'לא נמצאו הוצאות בתחום תיק השקעות — האם החיסכון נרשם?' });
+    insights.push({ level: 'warning', text: 'לא נמצאו הוצאות בתחום חיסכון — האם ההפקדות לחיסכון/השקעות נרשמו?' });
   }
 
   // Savings rate
@@ -89,6 +89,14 @@ export function getExpenseInsights(expenses) {
       insights.push({ level: 'warning', text: `דיור מהווה ${housingPct.toFixed(0)}% מהוצאות הבסיס — מומלץ עד 30-35%` });
     }
   }
+
+  // Single large expense
+  expenses.forEach(e => {
+    const pct = total > 0 ? ((Number(e.amount) || 0) / total) * 100 : 0;
+    if (pct > 40 && e.domain !== 'דיור' && e.domain !== 'חיסכון') {
+      insights.push({ level: 'info', text: `"${e.name}" מהווה ${pct.toFixed(0)}% מסך ההוצאות — הוצאה גדולה במיוחד` });
+    }
+  });
 
   if (insights.length === 0) {
     insights.push({ level: 'good', text: 'לא נמצאו בעיות בולטות בהוצאות הקבועות' });
@@ -134,6 +142,13 @@ export function getSavingsInsights(savings) {
     insights.push({ level: 'warning', text: `כל החסכונות במסלול אחד (${uniqueTypes[0]}) — שקול פיזור מסלולים` });
   }
 
+  // All in same company
+  const companies = savings.map(s => s.managingCompany).filter(Boolean);
+  const uniqueCompanies = [...new Set(companies)];
+  if (savings.length >= 2 && uniqueCompanies.length === 1) {
+    insights.push({ level: 'info', text: `כל החסכונות בחברה אחת (${uniqueCompanies[0]}) — שקול פיזור בין חברות` });
+  }
+
   // Negative return
   savings.forEach(s => {
     const current = Number(s.currentAmount) || 0;
@@ -141,6 +156,18 @@ export function getSavingsInsights(savings) {
     if (deposits > 0 && current < deposits) {
       const loss = ((deposits - current) / deposits * 100).toFixed(1);
       insights.push({ level: 'warning', text: `"${s.name}" בהפסד של ${loss}% — שווי נוכחי נמוך מסך ההפקדות` });
+    }
+  });
+
+  // Stale data (no lastUpdated in 6+ months)
+  const sixMonthsAgo = new Date();
+  sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+  savings.forEach(s => {
+    if (s.lastUpdated) {
+      const updated = new Date(s.lastUpdated);
+      if (updated < sixMonthsAgo) {
+        insights.push({ level: 'info', text: `"${s.name}" לא עודכן מאז ${s.lastUpdated} — מומלץ לרענן את הנתונים` });
+      }
     }
   });
 
@@ -185,8 +212,15 @@ export function getInvestmentInsights(investments, calcCurrentValueFn) {
     insights.push({ level: 'warning', text: `כל ההשקעות מסוג אחד (${types[0]}) — שקול פיזור לסוגים נוספים` });
   }
 
+  // All in same investment house
+  const houses = investments.map(inv => inv.investmentHouse).filter(Boolean);
+  const uniqueHouses = [...new Set(houses)];
+  if (investments.length >= 3 && uniqueHouses.length === 1) {
+    insights.push({ level: 'info', text: `כל ההשקעות בבית השקעות אחד (${uniqueHouses[0]}) — שקול פיזור` });
+  }
+
   // Foreign currency exposure
-  const foreignCount = investments.filter(inv => hasForeignExposure(inv.name, inv.type || '')).length;
+  const foreignCount = investments.filter(inv => hasForeignExposure(inv.name, inv.type || '') || inv.currency === 'USD').length;
   const foreignPct = investments.length > 0 ? (foreignCount / investments.length) * 100 : 0;
   if (foreignCount === 0 && investments.length >= 2) {
     insights.push({ level: 'info', text: 'לא זוהתה חשיפה למטבע חוץ — שקול הוספת נכסים גלובליים לגידור סיכון' });
@@ -203,6 +237,17 @@ export function getInvestmentInsights(investments, calcCurrentValueFn) {
       insights.push({ level: 'warning', text: `דמי ניהול של "${inv.name}": ${fee}% — מעל 0.5% המומלץ` });
     }
   });
+
+  // Stale price data (no lastUpdated in 30+ days)
+  const thirtyDaysAgo = new Date();
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+  const stale = investments.filter(inv => {
+    if (!inv.lastUpdated) return false;
+    return new Date(inv.lastUpdated) < thirtyDaysAgo;
+  });
+  if (stale.length > 0) {
+    insights.push({ level: 'info', text: `${stale.length} השקעה/ות לא עודכנו ב-30 יום האחרונים — ייתכן שהשווי לא מדויק` });
+  }
 
   // Missing price data
   const missingVal = investments.filter(inv => calcCurrentValueFn(inv) === null);
@@ -223,7 +268,7 @@ export function getDashboardInsights(state) {
 
   const totalExpenses = expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const totalIncomes = incomes.reduce((s, e) => s + (Number(e.amount) || 0), 0);
-  const savingsExpense = expenses.filter(e => e.domain === 'תיק השקעות').reduce((s, e) => s + (Number(e.amount) || 0), 0);
+  const savingsExpense = expenses.filter(e => e.domain === 'חיסכון').reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const balance = totalIncomes - totalExpenses;
 
   // No incomes entered

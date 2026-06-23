@@ -1,0 +1,225 @@
+/* KPI row */
+.credit-kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+@media (max-width: 900px) { .credit-kpi-row { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 480px) { .credit-kpi-row { grid-template-columns: 1fr 1fr; } }
+
+.credit-kpi-card {
+  background: #fff;
+  border-radius: 14px;
+  padding: 16px 20px;
+  box-shadow: 0 2px 12px rgba(0,0,0,0.06);
+  border-top: 3px solid #e8eaf6;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.credit-kpi-card.warn { border-top-color: #f7932a; background: linear-gradient(135deg, #fff8f0 0%, #fff 60%); }
+
+.credit-kpi-label { font-size: 0.75rem; color: #888; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; }
+.credit-kpi-value { font-size: 1.3rem; font-weight: 800; color: #1a1a2e; }
+.credit-kpi-sub { font-size: 0.75rem; color: #aaa; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+/* Chart cards */
+.credit-chart-card {
+  margin-bottom: 18px;
+}
+
+.credit-chart-title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: #1a1a2e;
+  margin-bottom: 16px;
+}
+
+.credit-active-filter {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 0.85rem;
+  color: #4361ee;
+}
+
+/* Legend row clickable */
+.credit-legend-row {
+  cursor: pointer;
+  border-radius: 6px;
+  padding: 4px 6px !important;
+  transition: background 0.12s;
+}
+
+.credit-legend-row:hover { background: #f5f7ff; }
+.credit-legend-row.active { background: #eef1ff; }
+
+/* Table */
+.credit-table-card { margin-top: 0; }
+
+.credit-date {
+  font-variant-numeric: tabular-nums;
+  font-size: 0.85rem;
+  color: #888;
+  white-space: nowrap;
+}
+
+.credit-desc {
+  max-width: 280px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.unclassified-row { background: #fffbf0; }
+.unclassified-row:hover td { background: #fff8e0 !important; }
+
+.unclassified-mcard { border-right: 3px solid #f7932a; }
+
+/* Category select */
+.cat-select {
+  padding: 5px 8px;
+  border: 1.5px solid #d0d5e8;
+  border-radius: 7px;
+  font-size: 0.82rem;
+  font-family: inherit;
+  background: #fff;
+  color: #333;
+  cursor: pointer;
+  outline: none;
+  direction: rtl;
+  max-width: 180px;
+}
+
+.cat-select:focus { border-color: #4361ee; }
+
+/* Import modal */
+.credit-import {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.credit-import-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.credit-import-field label {
+  font-size: 0.82rem;
+  color: #888;
+  font-weight: 600;
+}
+
+.credit-card-name-input {
+  padding: 9px 12px;
+  border: 1.5px solid #d0d5e8;
+  border-radius: 8px;
+  font-size: 0.92rem;
+  font-family: inherit;
+  direction: rtl;
+  outline: none;
+}
+
+.credit-card-name-input:focus { border-color: #4361ee; }
+
+.file-name {
+  font-size: 0.82rem;
+  color: #4361ee;
+  margin-top: 2px;
+}
+
+.credit-loading {
+  color: #888;
+  font-size: 0.9rem;
+  text-align: center;
+  padding: 8px 0;
+}
+
+.credit-error {
+  color: #c0392b;
+  font-size: 0.88rem;
+  background: #fff0f0;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+/* Tabs */
+.credit-tabs {
+  display: flex;
+  gap: 4px;
+  border-bottom: 2px solid #f0f0f0;
+  margin-bottom: 12px;
+}
+
+.credit-tab {
+  padding: 8px 18px;
+  border: none;
+  background: none;
+  font-family: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  color: #888;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  transition: color 0.15s;
+}
+
+.credit-tab.active {
+  color: #4361ee;
+  border-bottom-color: #4361ee;
+  font-weight: 600;
+}
+
+.tab-badge {
+  background: #f7932a;
+  color: #fff;
+  border-radius: 10px;
+  padding: 1px 7px;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Preview table */
+.credit-preview-table-wrap {
+  max-height: 340px;
+  overflow-y: auto;
+  border: 1px solid #f0f0f0;
+  border-radius: 8px;
+}
+
+.credit-preview-table .credit-date { width: 90px; }
+
+.credit-import-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid #f0f0f0;
+}
+
+.credit-import-summary {
+  font-size: 0.88rem;
+  color: #666;
+}
+
+/* Badge for unclassified in header */
+.unclassified-badge {
+  background: #fff3e0;
+  color: #f7932a;
+  border: 1.5px solid #f7932a;
+  border-radius: 20px;
+  padding: 4px 12px;
+  font-size: 0.82rem;
+  font-weight: 600;
+}

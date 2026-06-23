@@ -205,3 +205,51 @@
 }
 
 .filter-clear:hover { background: #f5f5f5; color: #333; }
+
+/* Shared pie chart / legend layout (used in multiple pages) */
+.dash-section { margin-bottom: 18px; }
+
+.dash-chart-layout-sm {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.dash-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 9px;
+  flex: 1;
+  min-width: 200px;
+}
+
+.legend-row {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 0.87rem;
+  padding: 4px 0;
+}
+
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.legend-name { flex: 1; color: #444; font-weight: 500; }
+.legend-pct  { color: #999; min-width: 42px; font-size: 0.82rem; }
+.legend-amount { font-weight: 700; color: #1a1a2e; min-width: 90px; text-align: left; }
+
+.legend-total {
+  display: flex;
+  justify-content: space-between;
+  padding-top: 9px;
+  margin-top: 3px;
+  border-top: 1px solid #eee;
+  font-weight: 700;
+  color: #1a1a2e;
+  font-size: 0.9rem;
+}

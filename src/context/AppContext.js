@@ -10,6 +10,7 @@ const INITIAL_STATE = {
   investments: [],
   incomes: [],
   snapshots: [],
+  creditTransactions: [],
 };
 
 const DOC_REF = doc(db, 'userData', 'main');
@@ -156,6 +157,15 @@ function reducer(state, action) {
       return { ...state, incomes: state.incomes.map(i => i.id === action.payload.id ? action.payload : i) };
     case 'DELETE_INCOME':
       return { ...state, incomes: state.incomes.filter(i => i.id !== action.payload) };
+
+    case 'ADD_CREDIT_TRANSACTIONS':
+      return { ...state, creditTransactions: [...(state.creditTransactions || []), ...action.payload.map(t => ({ ...t, id: t.id ?? Date.now() + Math.random() }))] };
+    case 'UPDATE_CREDIT_TRANSACTION':
+      return { ...state, creditTransactions: (state.creditTransactions || []).map(t => t.id === action.payload.id ? action.payload : t) };
+    case 'DELETE_CREDIT_TRANSACTION':
+      return { ...state, creditTransactions: (state.creditTransactions || []).filter(t => t.id !== action.payload) };
+    case 'CLEAR_CREDIT_TRANSACTIONS':
+      return { ...state, creditTransactions: [] };
 
     default:
       return state;

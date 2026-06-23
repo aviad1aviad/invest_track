@@ -4,8 +4,11 @@ import Modal from '../components/common/Modal';
 import { FormField, Input, FormActions } from '../components/common/FormField';
 import InsightsCard from '../components/common/InsightsCard';
 import { getExpenseInsights } from '../utils/insights';
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import './Page.css';
 import './Expenses.css';
+
+const PIE_COLORS = ['#e94560', '#f7932a', '#f7ae3a', '#4361ee', '#a259ff', '#b5b5b5', '#06d6a0', '#8ecae6', '#4895ef'];
 
 const DOMAINS = ['דיור', 'בית', 'אוכל', 'בריאות', 'חינוך', 'חוגים', 'תחבורה', 'תקשורת', 'שונות', 'חיסכון'];
 const PAYMENT_METHODS = ["צ'ק", 'כרטיס אשראי', 'הוראת קבע', 'העברה בנקאית'];
@@ -61,6 +64,11 @@ export default function Expenses() {
 
   const activeDomains = allDomains.filter(d => (byDomain[d] || []).length > 0);
 
+  const expensePieData = activeDomains
+    .map((name, i) => ({ name, value: domainTotal(name), color: PIE_COLORS[i % PIE_COLORS.length] }))
+    .filter(d => d.value > 0)
+    .sort((a, b) => b.value - a.value);
+
   return (
     <div className="page">
       <div className="page-header">
@@ -85,6 +93,33 @@ export default function Expenses() {
             <div className="exp-kpi-label">+ חיסכון</div>
             <div className="exp-kpi-value">₪{fmt(grandTotal)}</div>
             <div className="exp-kpi-sub">סה"כ כולל הכל</div>
+          </div>
+        </div>
+      )}
+
+      {expensePieData.length > 0 && (
+        <div className="card dash-section" style={{ marginBottom: 16 }}>
+          <div className="dash-chart-layout-sm">
+            <ResponsiveContainer width={200} height={200}>
+              <PieChart>
+                <Pie data={expensePieData} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={45} outerRadius={85}>
+                  {expensePieData.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Pie>
+                <Tooltip formatter={v => `₪${fmt(v)}`} />
+              </PieChart>
+            </ResponsiveContainer>
+            <div className="dash-legend">
+              {expensePieData.map((entry, i) => (
+                <div key={i} className="legend-row">
+                  <span className="legend-dot" style={{ background: entry.color }} />
+                  <span className="legend-name">{entry.name}</span>
+                  <span className="legend-pct">{grandTotal > 0 ? ((entry.value / grandTotal) * 100).toFixed(1) : 0}%</span>
+                  <span className="legend-amount">₪{fmt(entry.value)}</span>
+                </div>
+              ))}
+              <div className="legend-total"><span>סה"כ</span><span>₪{fmt(grandTotal)}</span></div>
+            </div>
           </div>
         </div>
       )}
