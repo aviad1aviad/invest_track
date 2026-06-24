@@ -74,12 +74,10 @@ function autoClassify(description) {
 function parseIsraeliDate(val) {
   if (!val) return null;
   if (typeof val === 'number') {
-    // Excel serial date
     const d = new Date(Math.round((val - 25569) * 86400 * 1000));
     return d.toISOString().slice(0, 10);
   }
   const str = String(val).trim();
-  // DD/MM/YYYY
   const match = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (match) {
     const [, d, m, y] = match;
@@ -100,14 +98,18 @@ function parseAmount(val) {
 function detectColumns(header) {
   const h = header.map(c => String(c || '').trim());
   const find = (...terms) => h.findIndex(c => terms.some(t => c.includes(t)));
+  // descCol: prefer longer/more specific match first, don't fall back to bare 'שם'
+  // to avoid matching unrelated columns like 'מספר' that happen to contain no match
+  const descCol = find('שם בית עסק', 'שם עסק', 'פרטי עסקה', 'פירוט', 'תיאור', 'עסק');
   return {
     dateCol:   find('תאריך'),
-    descCol:   find('שם בית עסק', 'תיאור', 'שם עסק', 'עסק', 'פירוט', 'שם'),
-    amountCol: find('סכום חיוב', 'סכום', 'חיוב', 'amount'),
+    descCol,
+    amountCol: find('סכום חיוב', 'סכום עסקה', 'סכום', 'חיוב', 'amount'),
   };
 }
 
-function parseExcelFile(file) {
+// Load raw rows + auto-detect columns — does NOT fully parse yet
+function loadRawFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = e => {
@@ -116,49 +118,55 @@ function parseExcelFile(file) {
         const ws = wb.Sheets[wb.SheetNames[0]];
         const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
 
-        // Find header row — look for a row that has date + desc + amount columns
         let headerIdx = -1;
-        let cols = null;
-        for (let i = 0; i < Math.min(20, allRows.length); i++) {
+        let detectedCols = null;
+        for (let i = 0; i < Math.min(25, allRows.length); i++) {
           const c = detectColumns(allRows[i]);
-          if (c.dateCol >= 0 && c.descCol >= 0 && c.amountCol >= 0) {
+          if (c.dateCol >= 0 && c.amountCol >= 0) {
             headerIdx = i;
-            cols = c;
+            detectedCols = c;
             break;
           }
         }
+        // Fallback: use first non-empty row as header even if we can't detect desc
         if (headerIdx < 0) {
-          reject(new Error('לא ניתן לזהות עמודות תאריך, תיאור וסכום בקובץ'));
-          return;
+          for (let i = 0; i < Math.min(25, allRows.length); i++) {
+            if (allRows[i].some(c => c !== '')) { headerIdx = i; break; }
+          }
+          detectedCols = { dateCol: -1, descCol: -1, amountCol: -1 };
         }
 
-        const rows = allRows.slice(headerIdx + 1);
-        const transactions = rows
-          .filter(r => r[cols.descCol] && r[cols.amountCol] !== '')
-          .map((r, i) => {
-            const amount = parseAmount(r[cols.amountCol]);
-            if (!amount || amount <= 0) return null;
-            const rawDate = parseIsraeliDate(r[cols.dateCol]);
-            const description = String(r[cols.descCol]).trim();
-            const category = autoClassify(description);
-            return {
-              id: Date.now() + i + Math.random(),
-              date: rawDate || '',
-              description,
-              amount,
-              category,
-              manual: false,
-            };
-          })
-          .filter(Boolean);
+        const headers = (allRows[headerIdx] || []).map((c, i) => ({ label: String(c || `עמודה ${i + 1}`).trim(), idx: i }));
+        const previewRows = allRows.slice(headerIdx + 1, headerIdx + 6);
 
-        resolve(transactions);
+        resolve({ headers, previewRows, allRows, headerIdx, detectedCols });
       } catch (err) {
         reject(err);
       }
     };
     reader.readAsArrayBuffer(file);
   });
+}
+
+function parseWithCols(allRows, headerIdx, cols) {
+  const rows = allRows.slice(headerIdx + 1);
+  return rows
+    .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
+    .map((r, i) => {
+      const amount = parseAmount(r[cols.amountCol]);
+      if (!amount || amount <= 0) return null;
+      const description = String(r[cols.descCol]).trim();
+      if (!description) return null;
+      return {
+        id: Date.now() + i + Math.random(),
+        date: parseIsraeliDate(r[cols.dateCol]) || '',
+        description,
+        amount,
+        category: autoClassify(description),
+        manual: false,
+      };
+    })
+    .filter(Boolean);
 }
 
 // ── Helper fns ─────────────────────────────────────────────────────────────────
@@ -199,24 +207,45 @@ function CategorySelect({ value, onChange }) {
 function ImportModal({ onImport, onClose }) {
   const [cardName, setCardName] = useState('');
   const [file, setFile] = useState(null);
+  const [rawData, setRawData] = useState(null);   // { headers, previewRows, allRows, headerIdx, detectedCols }
+  const [cols, setCols] = useState(null);          // { dateCol, descCol, amountCol }
   const [parsed, setParsed] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('classified');
+  const [step, setStep] = useState('file');        // 'file' | 'map' | 'review'
   const fileRef = useRef();
 
   const handleFile = async e => {
     const f = e.target.files[0];
     if (!f) return;
     setFile(f);
-    setLoading(true); setError('');
+    setLoading(true); setError(''); setRawData(null); setParsed(null); setCols(null);
     try {
-      const txns = await parseExcelFile(f);
-      setParsed(txns);
+      const raw = await loadRawFile(f);
+      setRawData(raw);
+      setCols(raw.detectedCols);
+      setStep('map');
     } catch (err) {
       setError(err.message || 'שגיאה בקריאת הקובץ');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleApplyCols = () => {
+    if (cols.dateCol < 0 || cols.descCol < 0 || cols.amountCol < 0) {
+      setError('יש לבחור עמודה לכל שדה (תאריך, תיאור, סכום)');
+      return;
+    }
+    setError('');
+    try {
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols);
+      if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
+      setParsed(txns);
+      setStep('review');
+    } catch (err) {
+      setError(err.message || 'שגיאה בניתוח הנתונים');
     }
   };
 
@@ -233,32 +262,121 @@ function ImportModal({ onImport, onClose }) {
     onImport(tagged);
   };
 
+  const ColSelect = ({ label, field }) => (
+    <div className="col-map-row">
+      <span className="col-map-label">{label}</span>
+      <select
+        className="filter-select"
+        value={cols[field] >= 0 ? cols[field] : ''}
+        onChange={e => setCols(c => ({ ...c, [field]: e.target.value === '' ? -1 : Number(e.target.value) }))}
+      >
+        <option value="">— לא נבחר —</option>
+        {(rawData?.headers || []).map(h => (
+          <option key={h.idx} value={h.idx}>{h.label || `עמודה ${h.idx + 1}`}</option>
+        ))}
+      </select>
+    </div>
+  );
+
   return (
     <Modal title="ייבוא פעולות אשראי" onClose={onClose}>
       <div className="credit-import">
-        <div className="credit-import-field">
-          <label>שם הכרטיס</label>
-          <input
-            className="credit-card-name-input"
-            value={cardName}
-            onChange={e => setCardName(e.target.value)}
-            placeholder="ויזה הפועלים, מסטרקארד לאומי..."
-          />
+
+        {/* Always-visible: card name + file picker */}
+        <div className="credit-import-top">
+          <div className="credit-import-field">
+            <label>שם הכרטיס</label>
+            <input
+              className="credit-card-name-input"
+              value={cardName}
+              onChange={e => setCardName(e.target.value)}
+              placeholder="ויזה הפועלים, כאל, מסטרקארד..."
+            />
+          </div>
+          <div className="credit-import-field">
+            <label>קובץ אקסל</label>
+            <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+              <button className="btn btn-secondary" onClick={() => fileRef.current.click()}>
+                📂 בחר קובץ
+              </button>
+              {file && <span className="file-name">{file.name}</span>}
+            </div>
+            <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display: 'none' }} />
+          </div>
         </div>
 
-        <div className="credit-import-field">
-          <label>קובץ אקסל</label>
-          <button className="btn btn-secondary" onClick={() => fileRef.current.click()}>
-            📂 בחר קובץ
-          </button>
-          {file && <span className="file-name">{file.name}</span>}
-          <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" onChange={handleFile} style={{ display: 'none' }} />
-        </div>
-
-        {loading && <div className="credit-loading">מנתח קובץ...</div>}
+        {loading && <div className="credit-loading">קורא קובץ...</div>}
         {error && <div className="credit-error">{error}</div>}
 
-        {parsed && (
+        {/* Step: column mapping */}
+        {step === 'map' && rawData && cols && (
+          <>
+            <div className="col-map-section">
+              <div className="col-map-title">
+                בחר איזו עמודה מכילה כל שדה
+                {cols.dateCol >= 0 && cols.descCol >= 0 && cols.amountCol >= 0
+                  ? <span className="col-map-ok"> ✓ זוהו אוטומטית</span>
+                  : <span className="col-map-warn"> ← יש לבחור ידנית</span>}
+              </div>
+              <ColSelect label="תאריך העסקה" field="dateCol" />
+              <ColSelect label="שם / תיאור העסק" field="descCol" />
+              <ColSelect label="סכום החיוב" field="amountCol" />
+            </div>
+
+            {/* Preview of first rows with currently-selected columns highlighted */}
+            <div className="col-map-preview-wrap">
+              <div className="col-map-preview-title">תצוגה מקדימה (5 שורות ראשונות)</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table className="data-table col-map-preview-table">
+                  <thead>
+                    <tr>
+                      {rawData.headers.map(h => (
+                        <th key={h.idx} className={
+                          h.idx === cols.dateCol ? 'col-hl-date' :
+                          h.idx === cols.descCol ? 'col-hl-desc' :
+                          h.idx === cols.amountCol ? 'col-hl-amount' : ''
+                        }>
+                          {h.idx === cols.dateCol ? '📅 ' : h.idx === cols.descCol ? '🏪 ' : h.idx === cols.amountCol ? '₪ ' : ''}
+                          {h.label}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {rawData.previewRows.map((row, ri) => (
+                      <tr key={ri}>
+                        {rawData.headers.map(h => (
+                          <td key={h.idx} className={
+                            h.idx === cols.dateCol ? 'col-hl-date' :
+                            h.idx === cols.descCol ? 'col-hl-desc' :
+                            h.idx === cols.amountCol ? 'col-hl-amount' : 'col-dim'
+                          }>
+                            {String(row[h.idx] ?? '')}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div className="credit-import-footer">
+              <span className="credit-import-summary">
+                {rawData.allRows.length - rawData.headerIdx - 1} שורות בקובץ
+              </span>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
+                <button className="btn btn-primary" onClick={handleApplyCols}>
+                  המשך →
+                </button>
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* Step: classify & review */}
+        {step === 'review' && parsed && (
           <>
             <div className="credit-tabs">
               <button
@@ -301,8 +419,8 @@ function ImportModal({ onImport, onClose }) {
                 {parsed.length} פעולות · ₪{fmt(parsed.reduce((s, t) => s + t.amount, 0))} סה"כ
               </span>
               <div style={{ display: 'flex', gap: 8 }}>
-                <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
-                <button className="btn btn-primary" onClick={handleConfirm} disabled={!parsed.length}>
+                <button className="btn btn-secondary" onClick={() => setStep('map')}>← חזור</button>
+                <button className="btn btn-primary" onClick={handleConfirm}>
                   ייבא {parsed.length} פעולות
                 </button>
               </div>
@@ -323,6 +441,7 @@ export default function CreditTracker() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterCard, setFilterCard] = useState('');
+  const [selectedIds, setSelectedIds] = useState(new Set());
 
   const handleImport = txns => {
     dispatch({ type: 'ADD_CREDIT_TRANSACTIONS', payload: txns });
@@ -332,6 +451,15 @@ export default function CreditTracker() {
   const handleDelete = id => {
     if (window.confirm('למחוק פעולה זו?')) {
       dispatch({ type: 'DELETE_CREDIT_TRANSACTION', payload: id });
+      setSelectedIds(prev => { const s = new Set(prev); s.delete(id); return s; });
+    }
+  };
+
+  const handleBulkDelete = () => {
+    if (selectedIds.size === 0) return;
+    if (window.confirm(`למחוק ${selectedIds.size} פעולות מסומנות?`)) {
+      selectedIds.forEach(id => dispatch({ type: 'DELETE_CREDIT_TRANSACTION', payload: id }));
+      setSelectedIds(new Set());
     }
   };
 
@@ -358,8 +486,32 @@ export default function CreditTracker() {
     );
   }, [transactions, filterCategory, filterMonth, filterCard]);
 
+  const sortedFiltered = useMemo(
+    () => [...filtered].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
+    [filtered]
+  );
+
   const totalAmount = filtered.reduce((s, t) => s + t.amount, 0);
   const unclassifiedCount = transactions.filter(t => !t.category).length;
+
+  const toggleSelect = id => setSelectedIds(prev => {
+    const s = new Set(prev);
+    s.has(id) ? s.delete(id) : s.add(id);
+    return s;
+  });
+
+  const isAllSelected = sortedFiltered.length > 0 && sortedFiltered.every(t => selectedIds.has(t.id));
+  const isIndeterminate = !isAllSelected && sortedFiltered.some(t => selectedIds.has(t.id));
+
+  const toggleSelectAll = () => {
+    if (isAllSelected) {
+      setSelectedIds(prev => { const s = new Set(prev); sortedFiltered.forEach(t => s.delete(t.id)); return s; });
+    } else {
+      setSelectedIds(prev => { const s = new Set(prev); sortedFiltered.forEach(t => s.add(t.id)); return s; });
+    }
+  };
+
+  const selectedAmount = sortedFiltered.filter(t => selectedIds.has(t.id)).reduce((s, t) => s + t.amount, 0);
 
   // Monthly bar chart data
   const monthlyData = useMemo(() => {
@@ -554,12 +706,36 @@ export default function CreditTracker() {
             )}
           </div>
 
+          {/* Bulk action bar */}
+          {selectedIds.size > 0 && (
+            <div className="bulk-bar">
+              <span className="bulk-info">
+                {selectedIds.size} פעולות מסומנות · ₪{fmt(selectedAmount)}
+              </span>
+              <button className="btn bulk-delete-btn" onClick={handleBulkDelete}>
+                🗑️ מחק {selectedIds.size} מסומנים
+              </button>
+              <button className="btn btn-secondary bulk-clear-btn" onClick={() => setSelectedIds(new Set())}>
+                בטל סימון
+              </button>
+            </div>
+          )}
+
           {/* Transactions table */}
           <div className="card credit-table-card desktop-only">
             <div style={{ overflowX: 'auto' }}>
               <table className="data-table">
                 <thead>
                   <tr>
+                    <th className="cb-col">
+                      <input
+                        type="checkbox"
+                        className="row-cb"
+                        checked={isAllSelected}
+                        ref={el => { if (el) el.indeterminate = isIndeterminate; }}
+                        onChange={toggleSelectAll}
+                      />
+                    </th>
                     <th>תאריך</th>
                     <th>תיאור</th>
                     <th>סכום</th>
@@ -569,27 +745,33 @@ export default function CreditTracker() {
                   </tr>
                 </thead>
                 <tbody>
-                  {filtered.length === 0 ? (
-                    <tr><td colSpan={6} style={{ textAlign: 'center', color: '#aaa', padding: 24 }}>אין פעולות להצגה</td></tr>
-                  ) : filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(t => (
-                    <tr key={t.id} className={!t.category ? 'unclassified-row' : ''}>
+                  {sortedFiltered.length === 0 ? (
+                    <tr><td colSpan={7} style={{ textAlign: 'center', color: '#aaa', padding: 24 }}>אין פעולות להצגה</td></tr>
+                  ) : sortedFiltered.map(t => (
+                    <tr key={t.id}
+                      className={`${!t.category ? 'unclassified-row' : ''} ${selectedIds.has(t.id) ? 'selected-row' : ''}`}
+                      onClick={() => toggleSelect(t.id)}
+                    >
+                      <td className="cb-col" onClick={e => e.stopPropagation()}>
+                        <input type="checkbox" className="row-cb" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} />
+                      </td>
                       <td className="credit-date">{t.date}</td>
                       <td>{t.description}</td>
                       <td className="num">₪{fmt(t.amount)}</td>
-                      <td>
+                      <td onClick={e => e.stopPropagation()}>
                         <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} />
                       </td>
                       <td>{t.cardName || '—'}</td>
-                      <td className="actions-cell">
+                      <td className="actions-cell" onClick={e => e.stopPropagation()}>
                         <button className="icon-btn" onClick={() => handleDelete(t.id)}>🗑️</button>
                       </td>
                     </tr>
                   ))}
                 </tbody>
-                {filtered.length > 0 && (
+                {sortedFiltered.length > 0 && (
                   <tfoot>
                     <tr className="total-row">
-                      <td colSpan={2}><strong>סה"כ{(filterMonth || filterCard || filterCategory) ? ' (מסונן)' : ''}</strong></td>
+                      <td /><td colSpan={2}><strong>סה"כ{(filterMonth || filterCard || filterCategory) ? ' (מסונן)' : ''}</strong></td>
                       <td className="num"><strong>₪{fmt(totalAmount)}</strong></td>
                       <td colSpan={3} />
                     </tr>
@@ -601,9 +783,12 @@ export default function CreditTracker() {
 
           {/* Mobile cards */}
           <div className="mobile-only">
-            {filtered.sort((a, b) => (b.date || '').localeCompare(a.date || '')).map(t => (
-              <div key={t.id} className={`mcard ${!t.category ? 'unclassified-mcard' : ''}`}>
+            {sortedFiltered.map(t => (
+              <div key={t.id}
+                className={`mcard ${!t.category ? 'unclassified-mcard' : ''} ${selectedIds.has(t.id) ? 'selected-mcard' : ''}`}
+              >
                 <div className="mcard-header">
+                  <input type="checkbox" className="row-cb" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} />
                   <span className="mcard-name">{t.description}</span>
                   <span className="mcard-value">₪{fmt(t.amount)}</span>
                   <button className="icon-btn" onClick={() => handleDelete(t.id)}>🗑️</button>
@@ -619,7 +804,7 @@ export default function CreditTracker() {
                 </div>
               </div>
             ))}
-            {filtered.length > 0 && (
+            {sortedFiltered.length > 0 && (
               <div className="mcard-total">
                 <span>סה"כ</span>
                 <span>₪{fmt(totalAmount)}</span>
