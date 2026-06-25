@@ -101,10 +101,14 @@ function detectColumns(header) {
   // descCol: prefer longer/more specific match first, don't fall back to bare 'שם'
   // to avoid matching unrelated columns like 'מספר' that happen to contain no match
   const descCol = find('שם בית עסק', 'שם עסק', 'פרטי עסקה', 'פירוט', 'תיאור', 'עסק');
+  const billingDateCol = find('תאריך חיוב', 'תאריך קרדיט', 'תאריך חיוב בפועל', 'חיוב בתאריך');
+  const dateCol = find('תאריך עסקה', 'תאריך');
   return {
-    dateCol:   find('תאריך'),
+    dateCol,
+    billingDateCol,
     descCol,
     amountCol: find('סכום חיוב', 'סכום עסקה', 'סכום', 'חיוב', 'amount'),
+    branchCol: find('ענף', 'תחום', 'קטגוריה', 'סוג עסקה', 'סוג'),
   };
 }
 
@@ -133,7 +137,7 @@ function loadRawFile(file) {
           for (let i = 0; i < Math.min(25, allRows.length); i++) {
             if (allRows[i].some(c => c !== '')) { headerIdx = i; break; }
           }
-          detectedCols = { dateCol: -1, descCol: -1, amountCol: -1 };
+          detectedCols = { dateCol: -1, billingDateCol: -1, descCol: -1, amountCol: -1, branchCol: -1 };
         }
 
         const headers = (allRows[headerIdx] || []).map((c, i) => ({ label: String(c || `עמודה ${i + 1}`).trim(), idx: i }));
@@ -157,11 +161,16 @@ function parseWithCols(allRows, headerIdx, cols) {
       if (!amount || amount <= 0) return null;
       const description = String(r[cols.descCol]).trim();
       if (!description) return null;
+      const branch = cols.branchCol >= 0 ? String(r[cols.branchCol] || '').trim() : '';
+      const txDate = parseIsraeliDate(r[cols.dateCol]) || '';
+      const billingDate = cols.billingDateCol >= 0 ? (parseIsraeliDate(r[cols.billingDateCol]) || '') : '';
       return {
         id: Date.now() + i + Math.random(),
-        date: parseIsraeliDate(r[cols.dateCol]) || '',
+        date: txDate,
+        billingDate,
         description,
         amount,
+        branch,
         category: autoClassify(description),
         manual: false,
       };
@@ -318,9 +327,11 @@ function ImportModal({ onImport, onClose }) {
                   ? <span className="col-map-ok"> ✓ זוהו אוטומטית</span>
                   : <span className="col-map-warn"> ← יש לבחור ידנית</span>}
               </div>
-              <ColSelect label="תאריך העסקה" field="dateCol" />
+              <ColSelect label="תאריך עסקה" field="dateCol" />
+              <ColSelect label="תאריך חיוב (אופציונלי)" field="billingDateCol" />
               <ColSelect label="שם / תיאור העסק" field="descCol" />
               <ColSelect label="סכום החיוב" field="amountCol" />
+              <ColSelect label="ענף / תחום (אופציונלי)" field="branchCol" />
             </div>
 
             {/* Preview of first rows with currently-selected columns highlighted */}
@@ -738,6 +749,7 @@ export default function CreditTracker() {
                     </th>
                     <th>תאריך</th>
                     <th>תיאור</th>
+                    <th>ענף</th>
                     <th>סכום</th>
                     <th>קטגוריה</th>
                     <th>כרטיס</th>
@@ -755,8 +767,14 @@ export default function CreditTracker() {
                       <td className="cb-col" onClick={e => e.stopPropagation()}>
                         <input type="checkbox" className="row-cb" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} />
                       </td>
-                      <td className="credit-date">{t.date}</td>
+                      <td className="credit-date">
+                        {t.billingDate || t.date}
+                        {t.billingDate && t.date && t.billingDate !== t.date && (
+                          <div className="credit-date-sub">עסקה: {t.date}</div>
+                        )}
+                      </td>
                       <td>{t.description}</td>
+                      <td className="credit-branch">{t.branch || '—'}</td>
                       <td className="num">₪{fmt(t.amount)}</td>
                       <td onClick={e => e.stopPropagation()}>
                         <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} />
@@ -771,7 +789,7 @@ export default function CreditTracker() {
                 {sortedFiltered.length > 0 && (
                   <tfoot>
                     <tr className="total-row">
-                      <td /><td colSpan={2}><strong>סה"כ{(filterMonth || filterCard || filterCategory) ? ' (מסונן)' : ''}</strong></td>
+                      <td /><td colSpan={3}><strong>סה"כ{(filterMonth || filterCard || filterCategory) ? ' (מסונן)' : ''}</strong></td>
                       <td className="num"><strong>₪{fmt(totalAmount)}</strong></td>
                       <td colSpan={3} />
                     </tr>
@@ -795,8 +813,8 @@ export default function CreditTracker() {
                 </div>
                 <div className="mcard-row">
                   <div className="mcard-stat">
-                    <span className="mcard-label">תאריך</span>
-                    <span className="mcard-value" style={{ fontSize: '0.85rem' }}>{t.date}</span>
+                    <span className="mcard-label">{t.billingDate ? 'תאריך חיוב' : 'תאריך'}</span>
+                    <span className="mcard-value" style={{ fontSize: '0.85rem' }}>{t.billingDate || t.date}</span>
                   </div>
                   <div className="mcard-stat">
                     <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} />

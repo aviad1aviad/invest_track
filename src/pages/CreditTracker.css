@@ -68,6 +68,21 @@
   white-space: nowrap;
 }
 
+.credit-date-sub {
+  font-size: 0.72rem;
+  color: #bbb;
+  margin-top: 1px;
+}
+
+.credit-branch {
+  font-size: 0.82rem;
+  color: #888;
+  max-width: 120px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .credit-desc {
   max-width: 280px;
   white-space: nowrap;
