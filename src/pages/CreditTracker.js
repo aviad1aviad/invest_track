@@ -96,10 +96,9 @@ function parseAmount(val) {
 }
 
 function detectColumns(header) {
-  const h = header.map(c => String(c || '').trim());
+  // Normalize \r\n within cells (common in Israeli bank exports like Diners/Mastercard)
+  const h = header.map(c => String(c || '').replace(/[\r\n]+/g, ' ').trim());
   const find = (...terms) => h.findIndex(c => terms.some(t => c.includes(t)));
-  // descCol: prefer longer/more specific match first, don't fall back to bare 'שם'
-  // to avoid matching unrelated columns like 'מספר' that happen to contain no match
   const descCol = find('שם בית עסק', 'שם עסק', 'פרטי עסקה', 'פירוט', 'תיאור', 'עסק');
   const billingDateCol = find('תאריך חיוב', 'תאריך קרדיט', 'תאריך חיוב בפועל', 'חיוב בתאריך');
   const dateCol = find('תאריך עסקה', 'תאריך');
@@ -140,10 +139,23 @@ function loadRawFile(file) {
           detectedCols = { dateCol: -1, billingDateCol: -1, descCol: -1, amountCol: -1, branchCol: -1 };
         }
 
-        const headers = (allRows[headerIdx] || []).map((c, i) => ({ label: String(c || `עמודה ${i + 1}`).trim(), idx: i }));
+        // Normalize \r\n in header labels for display
+        const headers = (allRows[headerIdx] || []).map((c, i) => ({
+          label: String(c || `עמודה ${i + 1}`).replace(/[\r\n]+/g, ' ').trim(),
+          idx: i,
+        }));
         const previewRows = allRows.slice(headerIdx + 1, headerIdx + 6);
 
-        resolve({ headers, previewRows, allRows, headerIdx, detectedCols });
+        // Extract global billing date from pre-header rows (e.g. "עסקאות לחיוב ב-10/06/2026")
+        let globalBillingDate = '';
+        const scanLimit = headerIdx >= 0 ? headerIdx : Math.min(10, allRows.length);
+        for (let i = 0; i < scanLimit; i++) {
+          const text = allRows[i].map(c => String(c || '')).join(' ');
+          const m = text.match(/לחיוב ב-(\d{1,2}\/\d{1,2}\/\d{4})/);
+          if (m) { globalBillingDate = parseIsraeliDate(m[1]) || ''; break; }
+        }
+
+        resolve({ headers, previewRows, allRows, headerIdx, detectedCols, globalBillingDate });
       } catch (err) {
         reject(err);
       }
@@ -152,7 +164,7 @@ function loadRawFile(file) {
   });
 }
 
-function parseWithCols(allRows, headerIdx, cols) {
+function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '') {
   const rows = allRows.slice(headerIdx + 1);
   return rows
     .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
@@ -163,7 +175,10 @@ function parseWithCols(allRows, headerIdx, cols) {
       if (!description) return null;
       const branch = cols.branchCol >= 0 ? String(r[cols.branchCol] || '').trim() : '';
       const txDate = parseIsraeliDate(r[cols.dateCol]) || '';
-      const billingDate = cols.billingDateCol >= 0 ? (parseIsraeliDate(r[cols.billingDateCol]) || '') : '';
+      // Use per-row billing date column if mapped, otherwise fall back to global billing date from file header
+      const billingDate = cols.billingDateCol >= 0
+        ? (parseIsraeliDate(r[cols.billingDateCol]) || globalBillingDate)
+        : globalBillingDate;
       return {
         id: Date.now() + i + Math.random(),
         date: txDate,
@@ -249,7 +264,7 @@ function ImportModal({ onImport, onClose }) {
     }
     setError('');
     try {
-      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols);
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '');
       if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
       setParsed(txns);
       setStep('review');
@@ -328,7 +343,12 @@ function ImportModal({ onImport, onClose }) {
                   : <span className="col-map-warn"> ← יש לבחור ידנית</span>}
               </div>
               <ColSelect label="תאריך עסקה" field="dateCol" />
-              <ColSelect label="תאריך חיוב (אופציונלי)" field="billingDateCol" />
+              {rawData.globalBillingDate
+                ? <div style={{ fontSize: '0.85rem', color: '#1a7a4a', fontWeight: 600, padding: '4px 0' }}>
+                    📅 תאריך חיוב זוהה: {rawData.globalBillingDate} (יוחל על כל העסקאות)
+                  </div>
+                : <ColSelect label="תאריך חיוב (אופציונלי)" field="billingDateCol" />
+              }
               <ColSelect label="שם / תיאור העסק" field="descCol" />
               <ColSelect label="סכום החיוב" field="amountCol" />
               <ColSelect label="ענף / תחום (אופציונלי)" field="branchCol" />
@@ -362,7 +382,9 @@ function ImportModal({ onImport, onClose }) {
                             h.idx === cols.descCol ? 'col-hl-desc' :
                             h.idx === cols.amountCol ? 'col-hl-amount' : 'col-dim'
                           }>
-                            {String(row[h.idx] ?? '')}
+                            {(h.idx === cols.dateCol || h.idx === cols.billingDateCol) && typeof row[h.idx] === 'number'
+                              ? (parseIsraeliDate(row[h.idx]) || String(row[h.idx] ?? ''))
+                              : String(row[h.idx] ?? '')}
                           </td>
                         ))}
                       </tr>
