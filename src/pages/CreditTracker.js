@@ -60,7 +60,8 @@ const RULES = [
   { keywords: ['amazon', 'aliexpress', 'ebay', 'shein', 'ASOS', 'paypal', 'אמזון', 'עלי אקספרס', 'אי ביי', 'online'], category: 'קניות אונליין' },
 ];
 
-function autoClassify(description) {
+// Keyword-only fallback (used for re-classification without branch context)
+function autoClassifyKeyword(description) {
   const lower = description.toLowerCase();
   for (const rule of RULES) {
     if (rule.keywords.some(kw => lower.includes(kw.toLowerCase()))) {
@@ -68,6 +69,12 @@ function autoClassify(description) {
     }
   }
   return null;
+}
+
+// Full classify: branch map takes priority, then keywords
+function autoClassify(description, branch, branchMap) {
+  if (branch && branchMap && branchMap[branch]) return branchMap[branch];
+  return autoClassifyKeyword(description);
 }
 
 // ── Excel parsing ──────────────────────────────────────────────────────────────
@@ -164,7 +171,7 @@ function loadRawFile(file) {
   });
 }
 
-function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '') {
+function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}) {
   const rows = allRows.slice(headerIdx + 1);
   return rows
     .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
@@ -186,7 +193,7 @@ function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '') {
         description,
         amount,
         branch,
-        category: autoClassify(description),
+        category: autoClassify(description, branch, branchMap),
         manual: false,
       };
     })
@@ -196,9 +203,10 @@ function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '') {
 // ── Helper fns ─────────────────────────────────────────────────────────────────
 function fmt(n) { return Math.round(Number(n)).toLocaleString('he-IL'); }
 
-function getCategoryColor(cat) {
-  const idx = CATEGORIES.indexOf(cat);
-  return idx >= 0 ? CATEGORY_COLORS[idx] : '#b5b5b5';
+function getCategoryColor(cat, activeCategories) {
+  const list = activeCategories && activeCategories.length > 0 ? activeCategories : CATEGORIES;
+  const idx = list.indexOf(cat);
+  return idx >= 0 ? CATEGORY_COLORS[idx % CATEGORY_COLORS.length] : '#b5b5b5';
 }
 
 function getMonth(dateStr) {
@@ -214,7 +222,8 @@ function fmtMonth(ym) {
 }
 
 // ── CategorySelect ─────────────────────────────────────────────────────────────
-function CategorySelect({ value, onChange }) {
+function CategorySelect({ value, onChange, categories }) {
+  const cats = categories && categories.length > 0 ? categories : CATEGORIES;
   return (
     <select
       className="cat-select"
@@ -222,13 +231,118 @@ function CategorySelect({ value, onChange }) {
       onChange={e => onChange(e.target.value || null)}
     >
       <option value="">— לא מסווג —</option>
-      {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+      {cats.map(c => <option key={c} value={c}>{c}</option>)}
     </select>
   );
 }
 
+// ── Category Settings modal ────────────────────────────────────────────────────
+function CategorySettingsModal({ onClose, onSave, initialCategories, initialBranchMap, knownBranches }) {
+  const [categories, setCategories] = useState(initialCategories);
+  const [branchMap, setBranchMap] = useState({ ...initialBranchMap });
+  const [newCatName, setNewCatName] = useState('');
+
+  const addCategory = () => {
+    const name = newCatName.trim();
+    if (!name || categories.includes(name)) return;
+    setCategories(prev => [...prev, name]);
+    setNewCatName('');
+  };
+
+  const removeCategory = cat => {
+    setCategories(prev => prev.filter(c => c !== cat));
+    setBranchMap(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (next[k] === cat) delete next[k]; });
+      return next;
+    });
+  };
+
+  const setMapping = (branch, cat) => {
+    setBranchMap(prev => {
+      const next = { ...prev };
+      if (!cat) delete next[branch]; else next[branch] = cat;
+      return next;
+    });
+  };
+
+  return (
+    <Modal title="ניהול קטגוריות" onClose={onClose}>
+      <div className="credit-import" style={{ minWidth: 400 }}>
+
+        {/* Categories list */}
+        <div>
+          <div className="col-map-title" style={{ marginBottom: 10 }}>הקטגוריות שלי</div>
+          <div className="cat-chips">
+            {categories.map(cat => (
+              <span key={cat} className="cat-chip">
+                {cat}
+                <button className="cat-chip-remove" onClick={() => removeCategory(cat)}>×</button>
+              </span>
+            ))}
+          </div>
+          <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
+            <input
+              className="credit-card-name-input"
+              style={{ flex: 1 }}
+              placeholder="שם קטגוריה חדשה..."
+              value={newCatName}
+              onChange={e => setNewCatName(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && addCategory()}
+            />
+            <button className="btn btn-secondary" onClick={addCategory}>+ הוסף</button>
+          </div>
+        </div>
+
+        {/* Branch → category mapping */}
+        {knownBranches.length > 0 && (
+          <div>
+            <div className="col-map-title" style={{ marginBottom: 10 }}>מיפוי ענף ← קטגוריה</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ fontSize: '0.9rem' }}>
+                <thead>
+                  <tr><th>ענף (מהקובץ)</th><th>קטגוריה</th></tr>
+                </thead>
+                <tbody>
+                  {knownBranches.map(branch => (
+                    <tr key={branch}>
+                      <td>{branch}</td>
+                      <td>
+                        <select
+                          className="filter-select"
+                          value={branchMap[branch] || ''}
+                          onChange={e => setMapping(branch, e.target.value)}
+                        >
+                          <option value="">— לא מסווג —</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        <div className="credit-import-footer">
+          <span className="credit-import-summary">
+            {Object.keys(branchMap).length} ענפים ממופים מתוך {knownBranches.length}
+          </span>
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
+            <button className="btn btn-primary" onClick={() => onSave({ newCategories: categories, newBranchMap: branchMap })}>
+              שמור ויישם
+            </button>
+          </div>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Import modal ───────────────────────────────────────────────────────────────
-function ImportModal({ onImport, onClose }) {
+function ImportModal({ onImport, onClose, branchMap, categories }) {
   const [cardName, setCardName] = useState('');
   const [file, setFile] = useState(null);
   const [rawData, setRawData] = useState(null);   // { headers, previewRows, allRows, headerIdx, detectedCols }
@@ -264,7 +378,7 @@ function ImportModal({ onImport, onClose }) {
     }
     setError('');
     try {
-      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '');
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {});
       if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
       setParsed(txns);
       setStep('review');
@@ -439,7 +553,7 @@ function ImportModal({ onImport, onClose }) {
                       <td className="credit-desc">{t.description}</td>
                       <td className="num">₪{fmt(t.amount)}</td>
                       <td>
-                        <CategorySelect value={t.category} onChange={cat => updateCategory(t.id, cat)} />
+                        <CategorySelect value={t.category} onChange={cat => updateCategory(t.id, cat)} categories={categories} />
                       </td>
                     </tr>
                   ))}
@@ -470,7 +584,15 @@ export default function CreditTracker() {
   const { state, dispatch } = useApp();
   const transactions = useMemo(() => state.creditTransactions || [], [state.creditTransactions]);
 
+  // Custom categories and branch mapping from state
+  const categories = useMemo(
+    () => (state.creditCategories && state.creditCategories.length > 0 ? state.creditCategories : CATEGORIES),
+    [state.creditCategories]
+  );
+  const branchMap = useMemo(() => state.creditBranchMap || {}, [state.creditBranchMap]);
+
   const [showImport, setShowImport] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterCard, setFilterCard] = useState('');
@@ -501,9 +623,21 @@ export default function CreditTracker() {
     if (txn) dispatch({ type: 'UPDATE_CREDIT_TRANSACTION', payload: { ...txn, category, manual: true } });
   };
 
-  // Derived data
+  const handleSaveSettings = ({ newCategories, newBranchMap }) => {
+    dispatch({ type: 'SET_CREDIT_CATEGORIES', payload: newCategories });
+    const reclassified = transactions.map(t => {
+      if (t.branch && newBranchMap[t.branch]) return { ...t, category: newBranchMap[t.branch] };
+      const byKeyword = autoClassifyKeyword(t.description);
+      if (byKeyword) return { ...t, category: byKeyword };
+      return t;
+    });
+    dispatch({ type: 'APPLY_CREDIT_BRANCH_MAP', payload: { branchMap: newBranchMap, transactions: reclassified } });
+    setShowSettings(false);
+  };
+
+  // Derived data — use billing date for month grouping
   const allMonths = useMemo(() => {
-    const months = [...new Set(transactions.map(t => getMonth(t.date)).filter(Boolean))].sort();
+    const months = [...new Set(transactions.map(t => getMonth(t.billingDate || t.date)).filter(Boolean))].sort().reverse();
     return months;
   }, [transactions]);
 
@@ -514,7 +648,7 @@ export default function CreditTracker() {
   const filtered = useMemo(() => {
     return transactions.filter(t =>
       (!filterCategory || t.category === filterCategory) &&
-      (!filterMonth   || getMonth(t.date) === filterMonth) &&
+      (!filterMonth   || getMonth(t.billingDate || t.date) === filterMonth) &&
       (!filterCard    || t.cardName === filterCard)
     );
   }, [transactions, filterCategory, filterMonth, filterCard]);
@@ -546,11 +680,11 @@ export default function CreditTracker() {
 
   const selectedAmount = sortedFiltered.filter(t => selectedIds.has(t.id)).reduce((s, t) => s + t.amount, 0);
 
-  // Monthly bar chart data
+  // Monthly bar chart data (by billing date)
   const monthlyData = useMemo(() => {
     const map = {};
     transactions.forEach(t => {
-      const m = getMonth(t.date);
+      const m = getMonth(t.billingDate || t.date);
       if (!m) return;
       if (!map[m]) map[m] = { month: m, label: fmtMonth(m), total: 0 };
       map[m].total += t.amount;
@@ -558,10 +692,15 @@ export default function CreditTracker() {
     return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
   }, [transactions]);
 
+  // All unique non-empty branch values (for settings modal)
+  const knownBranches = useMemo(() => {
+    return [...new Set(transactions.map(t => t.branch).filter(Boolean))].sort();
+  }, [transactions]);
+
   // Category pie data (filtered by month/card if active)
   const relevantForPie = useMemo(() => {
     return transactions.filter(t =>
-      (!filterMonth || getMonth(t.date) === filterMonth) &&
+      (!filterMonth || getMonth(t.billingDate || t.date) === filterMonth) &&
       (!filterCard  || t.cardName === filterCard) &&
       t.category
     );
@@ -573,10 +712,10 @@ export default function CreditTracker() {
       map[t.category] = (map[t.category] || 0) + t.amount;
     });
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value, color: getCategoryColor(name) }))
+      .map(([name, value]) => ({ name, value, color: getCategoryColor(name, categories) }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [relevantForPie]);
+  }, [relevantForPie, categories]);
 
   const pieTotal = categoryPieData.reduce((s, d) => s + d.value, 0);
 
@@ -588,6 +727,9 @@ export default function CreditTracker() {
           {unclassifiedCount > 0 && (
             <span className="unclassified-badge">{unclassifiedCount} לא מסווגים</span>
           )}
+          <button className="btn btn-secondary" onClick={() => setShowSettings(true)} title="ניהול קטגוריות">
+            ⚙️ קטגוריות
+          </button>
           <button className="btn btn-primary" onClick={() => setShowImport(true)}>
             📥 ייבוא אקסל
           </button>
@@ -633,6 +775,27 @@ export default function CreditTracker() {
               </div>
             )}
           </div>
+
+          {/* Month tabs */}
+          {allMonths.length > 0 && (
+            <div className="credit-month-tabs">
+              <button
+                className={`credit-month-tab ${filterMonth === '' ? 'active' : ''}`}
+                onClick={() => setFilterMonth('')}
+              >
+                כל החודשים
+              </button>
+              {allMonths.map(m => (
+                <button
+                  key={m}
+                  className={`credit-month-tab ${filterMonth === m ? 'active' : ''}`}
+                  onClick={() => setFilterMonth(m)}
+                >
+                  {fmtMonth(m)}
+                </button>
+              ))}
+            </div>
+          )}
 
           {/* Monthly bar chart */}
           {monthlyData.length > 1 && (
@@ -716,12 +879,6 @@ export default function CreditTracker() {
 
           {/* Filters */}
           <div className="filter-bar">
-            {allMonths.length > 1 && (
-              <select className="filter-select" value={filterMonth} onChange={e => setFilterMonth(e.target.value)}>
-                <option value="">כל החודשים</option>
-                {allMonths.map(m => <option key={m} value={m}>{fmtMonth(m)}</option>)}
-              </select>
-            )}
             {allCards.length > 1 && (
               <select className="filter-select" value={filterCard} onChange={e => setFilterCard(e.target.value)}>
                 <option value="">כל הכרטיסים</option>
@@ -730,7 +887,7 @@ export default function CreditTracker() {
             )}
             <select className="filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
               <option value="">כל הקטגוריות</option>
-              {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+              {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
             {(filterMonth || filterCard || filterCategory) && (
               <button className="filter-clear" onClick={() => { setFilterMonth(''); setFilterCard(''); setFilterCategory(''); }}>
@@ -799,7 +956,7 @@ export default function CreditTracker() {
                       <td className="credit-branch">{t.branch || '—'}</td>
                       <td className="num">₪{fmt(t.amount)}</td>
                       <td onClick={e => e.stopPropagation()}>
-                        <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} />
+                        <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} categories={categories} />
                       </td>
                       <td>{t.cardName || '—'}</td>
                       <td className="actions-cell" onClick={e => e.stopPropagation()}>
@@ -839,7 +996,7 @@ export default function CreditTracker() {
                     <span className="mcard-value" style={{ fontSize: '0.85rem' }}>{t.billingDate || t.date}</span>
                   </div>
                   <div className="mcard-stat">
-                    <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} />
+                    <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} categories={categories} />
                   </div>
                 </div>
               </div>
@@ -855,7 +1012,22 @@ export default function CreditTracker() {
       )}
 
       {showImport && (
-        <ImportModal onImport={handleImport} onClose={() => setShowImport(false)} />
+        <ImportModal
+          onImport={handleImport}
+          onClose={() => setShowImport(false)}
+          branchMap={branchMap}
+          categories={categories}
+        />
+      )}
+
+      {showSettings && (
+        <CategorySettingsModal
+          onClose={() => setShowSettings(false)}
+          onSave={handleSaveSettings}
+          initialCategories={categories}
+          initialBranchMap={branchMap}
+          knownBranches={knownBranches}
+        />
       )}
     </div>
   );

@@ -11,6 +11,8 @@ const INITIAL_STATE = {
   incomes: [],
   snapshots: [],
   creditTransactions: [],
+  creditCategories: [],   // [] = use defaults in CreditTracker
+  creditBranchMap: {},    // { branchValue: categoryName }
 };
 
 const DOC_REF = doc(db, 'userData', 'main');
@@ -166,6 +168,11 @@ function reducer(state, action) {
       return { ...state, creditTransactions: (state.creditTransactions || []).filter(t => t.id !== action.payload) };
     case 'CLEAR_CREDIT_TRANSACTIONS':
       return { ...state, creditTransactions: [] };
+
+    case 'SET_CREDIT_CATEGORIES':
+      return { ...state, creditCategories: action.payload };
+    case 'APPLY_CREDIT_BRANCH_MAP':
+      return { ...state, creditBranchMap: action.payload.branchMap, creditTransactions: action.payload.transactions };
 
     default:
       return state;
