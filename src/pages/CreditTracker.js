@@ -88,11 +88,23 @@ function parseIsraeliDate(val, swapDayMonth = false) {
   const match = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (match) {
     const [, a, b, y] = match;
-    const [d, m] = swapDayMonth ? [b, a] : [a, b];
+    let [d, m] = swapDayMonth ? [b, a] : [a, b];
+    // Auto-fix: if parsed month is impossible (>12), the file uses MM/DD — swap automatically
+    if (parseInt(m, 10) > 12) { [d, m] = [m, d]; }
     const year = y.length === 2 ? '20' + y : y;
     return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
   return str;
+}
+
+// Fix already-stored dates where day/month were swapped (e.g. "2026-20-05" → "2026-05-20")
+function normalizeDate(dateStr) {
+  if (!dateStr || dateStr.length < 10) return dateStr || '';
+  const m = dateStr.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (m && parseInt(m[2], 10) > 12 && parseInt(m[3], 10) <= 12) {
+    return `${m[1]}-${m[3]}-${m[2]}`;
+  }
+  return dateStr;
 }
 
 function parseAmount(val) {
@@ -223,8 +235,9 @@ function getCategoryColor(cat, activeCategories) {
 }
 
 function getMonth(dateStr) {
-  if (!dateStr || dateStr.length < 7) return null;
-  return dateStr.slice(0, 7); // YYYY-MM
+  const fixed = normalizeDate(dateStr);
+  if (!fixed || fixed.length < 7) return null;
+  return fixed.slice(0, 7); // YYYY-MM
 }
 
 function fmtMonth(ym) {
@@ -1102,9 +1115,9 @@ export default function CreditTracker() {
                         <input type="checkbox" className="row-cb" checked={selectedIds.has(t.id)} onChange={() => toggleSelect(t.id)} />
                       </td>
                       <td className="credit-date">
-                        {t.billingDate || t.date}
+                        {normalizeDate(t.billingDate || t.date)}
                         {t.billingDate && t.date && t.billingDate !== t.date && (
-                          <div className="credit-date-sub">עסקה: {t.date}</div>
+                          <div className="credit-date-sub">עסקה: {normalizeDate(t.date)}</div>
                         )}
                       </td>
                       <td>{t.description}</td>
@@ -1148,7 +1161,7 @@ export default function CreditTracker() {
                 <div className="mcard-row">
                   <div className="mcard-stat">
                     <span className="mcard-label">{t.billingDate ? 'תאריך חיוב' : 'תאריך'}</span>
-                    <span className="mcard-value" style={{ fontSize: '0.85rem' }}>{t.billingDate || t.date}</span>
+                    <span className="mcard-value" style={{ fontSize: '0.85rem' }}>{normalizeDate(t.billingDate || t.date)}</span>
                   </div>
                   <div className="mcard-stat">
                     <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} categories={categories} />
