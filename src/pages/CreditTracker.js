@@ -576,7 +576,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                 : <ColSelect label="תאריך חיוב (אופציונלי)" field="billingDateCol" />
               }
               <ColSelect label="שם / תיאור העסק" field="descCol" />
-              <ColSelect label={sourceType === 'bank' ? 'עמודת חובה (הוצאות) / זכות (הכנסות)' : 'סכום החיוב'} field="amountCol" />
+              <ColSelect label={sourceType === 'bank' ? 'עמודת חובה (הוצאות)' : 'סכום החיוב'} field="amountCol" />
               <ColSelect label="ענף / תחום (אופציונלי)" field="branchCol" />
             </div>
 
