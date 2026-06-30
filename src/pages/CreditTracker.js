@@ -1,4 +1,4 @@
-import React, { useState, useRef, useMemo } from 'react';
+import React, { useState, useRef, useMemo, useEffect } from 'react';
 import { useApp } from '../context/AppContext';
 import Modal from '../components/common/Modal';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid } from 'recharts';
@@ -233,6 +233,50 @@ function CategorySelect({ value, onChange, categories }) {
       <option value="">— לא מסווג —</option>
       {cats.map(c => <option key={c} value={c}>{c}</option>)}
     </select>
+  );
+}
+
+// ── Multi-category filter dropdown ────────────────────────────────────────────
+function MultiCategoryFilter({ categories, selected, onChange }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef();
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false); };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const toggle = cat => onChange(
+    selected.includes(cat) ? selected.filter(c => c !== cat) : [...selected, cat]
+  );
+
+  const label = selected.length === 0 ? 'כל הקטגוריות' : `${selected.length} קטגוריות ▾`;
+
+  return (
+    <div className="multi-cat-filter" ref={ref}>
+      <button
+        className={`filter-select multi-cat-trigger ${selected.length > 0 ? 'active' : ''}`}
+        onClick={() => setOpen(p => !p)}
+      >
+        {label}
+      </button>
+      {open && (
+        <div className="multi-cat-dropdown">
+          {categories.map(cat => (
+            <label key={cat} className="multi-cat-option">
+              <input type="checkbox" checked={selected.includes(cat)} onChange={() => toggle(cat)} />
+              <span>{cat}</span>
+            </label>
+          ))}
+          {selected.length > 0 && (
+            <button className="filter-clear multi-cat-clear" onClick={() => { onChange([]); setOpen(false); }}>
+              ✕ נקה בחירה
+            </button>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -649,10 +693,10 @@ export default function CreditTracker() {
 
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
-  const [filterCategory, setFilterCategory] = useState('');
+  const [filterCategories, setFilterCategories] = useState([]); // string[]
   const [filterMonth, setFilterMonth] = useState('');
   const [filterCard, setFilterCard] = useState('');
-  const [filterSource, setFilterSource] = useState('');        // '' | 'credit' | 'bank'
+  const [filterSource, setFilterSource] = useState('');
   const [filterUnclassified, setFilterUnclassified] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -708,13 +752,13 @@ export default function CreditTracker() {
 
   const filtered = useMemo(() => {
     return transactions.filter(t =>
-      (!filterCategory     || t.category === filterCategory) &&
-      (!filterMonth        || getMonth(t.billingDate || t.date) === filterMonth) &&
-      (!filterCard         || t.cardName === filterCard) &&
-      (!filterSource       || (t.sourceType || 'credit') === filterSource) &&
-      (!filterUnclassified || !t.category)
+      (!filterCategories.length || filterCategories.includes(t.category)) &&
+      (!filterMonth             || getMonth(t.billingDate || t.date) === filterMonth) &&
+      (!filterCard              || t.cardName === filterCard) &&
+      (!filterSource            || (t.sourceType || 'credit') === filterSource) &&
+      (!filterUnclassified      || !t.category)
     );
-  }, [transactions, filterCategory, filterMonth, filterCard, filterSource, filterUnclassified]);
+  }, [transactions, filterCategories, filterMonth, filterCard, filterSource, filterUnclassified]);
 
   const sortedFiltered = useMemo(
     () => [...filtered].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
@@ -760,14 +804,15 @@ export default function CreditTracker() {
     return [...new Set(transactions.map(t => t.branch).filter(Boolean))].sort();
   }, [transactions]);
 
-  // Category pie data (filtered by month/card if active)
+  // Category pie data — not filtered by category (shows all categories for month/card)
   const relevantForPie = useMemo(() => {
     return transactions.filter(t =>
-      (!filterMonth || getMonth(t.billingDate || t.date) === filterMonth) &&
-      (!filterCard  || t.cardName === filterCard) &&
+      (!filterMonth  || getMonth(t.billingDate || t.date) === filterMonth) &&
+      (!filterCard   || t.cardName === filterCard) &&
+      (!filterSource || (t.sourceType || 'credit') === filterSource) &&
       t.category
     );
-  }, [transactions, filterMonth, filterCard]);
+  }, [transactions, filterMonth, filterCard, filterSource]);
 
   const categoryPieData = useMemo(() => {
     const map = {};
@@ -896,7 +941,11 @@ export default function CreditTracker() {
             <div className="card credit-chart-card">
               <div className="credit-chart-title">
                 פיזור לפי קטגוריה
-                {filterCategory && <span style={{ marginRight: 8, fontSize: '0.82rem', color: '#4361ee' }}>· מסונן: {filterCategory}</span>}
+                {filterCategories.length > 0 && (
+                  <span style={{ marginRight: 8, fontSize: '0.82rem', color: '#4361ee' }}>
+                    · {filterCategories.length === 1 ? filterCategories[0] : `${filterCategories.length} קטגוריות · ₪${fmt(totalAmount)}`}
+                  </span>
+                )}
               </div>
               <div className="dash-chart-layout-sm">
                 <ResponsiveContainer width={220} height={220}>
@@ -907,14 +956,14 @@ export default function CreditTracker() {
                       nameKey="name"
                       cx="50%" cy="50%"
                       innerRadius={50} outerRadius={95}
-                      onClick={d => setFilterCategory(prev => prev === d.name ? '' : d.name)}
+                      onClick={d => setFilterCategories(prev => prev.includes(d.name) ? prev.filter(c => c !== d.name) : [...prev, d.name])}
                       style={{ cursor: 'pointer' }}
                     >
                       {categoryPieData.map((entry, i) => (
                         <Cell
                           key={i}
                           fill={entry.color}
-                          opacity={filterCategory && filterCategory !== entry.name ? 0.35 : 1}
+                          opacity={filterCategories.length > 0 && !filterCategories.includes(entry.name) ? 0.35 : 1}
                         />
                       ))}
                     </Pie>
@@ -925,8 +974,8 @@ export default function CreditTracker() {
                   {categoryPieData.map((entry, i) => (
                     <div
                       key={i}
-                      className={`legend-row credit-legend-row ${filterCategory === entry.name ? 'active' : ''}`}
-                      onClick={() => setFilterCategory(prev => prev === entry.name ? '' : entry.name)}
+                      className={`legend-row credit-legend-row ${filterCategories.includes(entry.name) ? 'active' : ''}`}
+                      onClick={() => setFilterCategories(prev => prev.includes(entry.name) ? prev.filter(c => c !== entry.name) : [...prev, entry.name])}
                     >
                       <span className="legend-dot" style={{ background: entry.color }} />
                       <span className="legend-name">{entry.name}</span>
@@ -953,18 +1002,19 @@ export default function CreditTracker() {
               <option value="credit">💳 כרטיס אשראי</option>
               <option value="bank">🏦 חשבון בנק</option>
             </select>
-            <select className="filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
-              <option value="">כל הקטגוריות</option>
-              {categories.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            <MultiCategoryFilter
+              categories={categories}
+              selected={filterCategories}
+              onChange={setFilterCategories}
+            />
             <button
               className={`filter-unclassified-btn ${filterUnclassified ? 'active' : ''}`}
               onClick={() => setFilterUnclassified(p => !p)}
             >
               ⚠️ לא מסווגים בלבד
             </button>
-            {(filterMonth || filterCard || filterSource || filterCategory || filterUnclassified) && (
-              <button className="filter-clear" onClick={() => { setFilterMonth(''); setFilterCard(''); setFilterSource(''); setFilterCategory(''); setFilterUnclassified(false); }}>
+            {(filterMonth || filterCard || filterSource || filterCategories.length > 0 || filterUnclassified) && (
+              <button className="filter-clear" onClick={() => { setFilterMonth(''); setFilterCard(''); setFilterSource(''); setFilterCategories([]); setFilterUnclassified(false); }}>
                 ✕ נקה הכל
               </button>
             )}
@@ -1042,7 +1092,7 @@ export default function CreditTracker() {
                 {sortedFiltered.length > 0 && (
                   <tfoot>
                     <tr className="total-row">
-                      <td /><td colSpan={3}><strong>סה"כ{(filterMonth || filterCard || filterCategory) ? ' (מסונן)' : ''}</strong></td>
+                      <td /><td colSpan={3}><strong>סה"כ{(filterMonth || filterCard || filterCategories.length || filterSource || filterUnclassified) ? ' (מסונן)' : ''}</strong></td>
                       <td className="num"><strong>₪{fmt(totalAmount)}</strong></td>
                       <td colSpan={3} />
                     </tr>
