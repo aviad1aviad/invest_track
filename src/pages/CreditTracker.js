@@ -106,15 +106,18 @@ function detectColumns(header) {
   // Normalize \r\n within cells (common in Israeli bank exports like Diners/Mastercard)
   const h = header.map(c => String(c || '').replace(/[\r\n]+/g, ' ').trim());
   const find = (...terms) => h.findIndex(c => terms.some(t => c.includes(t)));
-  const descCol = find('שם בית עסק', 'שם עסק', 'פרטי עסקה', 'פירוט', 'תיאור', 'עסק');
+  // Credit card: שם בית עסק / Bank: סוג תנועה
+  const descCol = find('שם בית עסק', 'שם עסק', 'סוג תנועה', 'פרטי עסקה', 'פירוט', 'תיאור', 'עסק');
   const billingDateCol = find('תאריך חיוב', 'תאריך קרדיט', 'תאריך חיוב בפועל', 'חיוב בתאריך');
   const dateCol = find('תאריך עסקה', 'תאריך');
+  // Credit: סכום חיוב / Bank debit: חובה / Bank credit: זכות
+  const amountCol = find('סכום חיוב', 'סכום עסקה', 'חובה', 'סכום', 'amount');
   return {
     dateCol,
     billingDateCol,
     descCol,
-    amountCol: find('סכום חיוב', 'סכום עסקה', 'סכום', 'חיוב', 'amount'),
-    branchCol: find('ענף', 'תחום', 'קטגוריה', 'סוג עסקה', 'סוג'),
+    amountCol,
+    branchCol: find('ענף', 'תחום', 'קטגוריה', 'סוג עסקה'),
   };
 }
 
@@ -125,8 +128,17 @@ function loadRawFile(file) {
     reader.onload = e => {
       try {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
-        const ws = wb.Sheets[wb.SheetNames[0]];
-        const allRows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' });
+        // Try all sheets; pick the one where we can detect a valid header (date+amount)
+        let allRows = [];
+        for (const name of wb.SheetNames) {
+          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' });
+          const hasHeader = rows.slice(0, 25).some(r => {
+            const c = detectColumns(r);
+            return c.dateCol >= 0 && c.amountCol >= 0;
+          });
+          if (hasHeader || rows.length > allRows.length) allRows = rows;
+          if (hasHeader) break;
+        }
 
         let headerIdx = -1;
         let detectedCols = null;
@@ -564,7 +576,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                 : <ColSelect label="תאריך חיוב (אופציונלי)" field="billingDateCol" />
               }
               <ColSelect label="שם / תיאור העסק" field="descCol" />
-              <ColSelect label="סכום החיוב" field="amountCol" />
+              <ColSelect label={sourceType === 'bank' ? 'עמודת חובה (הוצאות) / זכות (הכנסות)' : 'סכום החיוב'} field="amountCol" />
               <ColSelect label="ענף / תחום (אופציונלי)" field="branchCol" />
             </div>
 
