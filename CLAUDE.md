@@ -97,6 +97,11 @@ Israeli benchmark thresholds used:
 
 ## Changelog
 
+### 2026-06-28 (session 3)
+- **CreditTracker: custom categories + branch mapping** — new `⚙️ קטגוריות` modal; user defines category list (add/remove chips) and maps each known branch value to a category; saving re-classifies all existing transactions automatically (branch map → keyword fallback); categories + branchMap persisted in Firestore via `creditCategories` + `creditBranchMap` state fields
+- **CreditTracker: month tabs** — pill-style tabs by billing month replace the month filter dropdown; all grouping (bar chart, pie, filter) now uses `billingDate` with `date` as fallback
+- **CreditTracker: autoClassify** — split into `autoClassifyKeyword` (keyword-only) + `autoClassify(description, branch, branchMap)` (branch map takes priority); `parseWithCols` now accepts `branchMap` so imported transactions are classified immediately
+
 ### 2026-06-25 (session 2)
 - **CreditTracker: Diners/Mastercard Excel fix** — `detectColumns` now strips `\r\n` from header cells (Mizrahi bank exports use multi-line cell headers); `loadRawFile` extracts global billing date from pre-header row `"עסקאות לחיוב ב-DD/MM/YYYY"`; `parseWithCols` accepts `globalBillingDate` fallback; UI shows green notice when billing date auto-detected; preview table renders Excel serial numbers as real dates
 - **CLAUDE.md** — created this file (session 1)
