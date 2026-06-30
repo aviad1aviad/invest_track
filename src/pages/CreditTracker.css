@@ -392,6 +392,52 @@
   font-weight: 600;
 }
 
+/* Source type toggle (import modal) */
+.source-type-toggle {
+  display: flex;
+  gap: 0;
+  border: 1.5px solid #d0d5e8;
+  border-radius: 10px;
+  overflow: hidden;
+  width: fit-content;
+}
+
+.source-type-btn {
+  padding: 9px 20px;
+  border: none;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.88rem;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.source-type-btn:first-child { border-left: none; }
+.source-type-btn + .source-type-btn { border-right: 1.5px solid #d0d5e8; }
+
+.source-type-btn.active {
+  background: #4361ee;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* Unclassified filter button */
+.filter-unclassified-btn {
+  padding: 7px 14px;
+  border: 1.5px solid #e0e4f0;
+  border-radius: 8px;
+  background: #fff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  color: #666;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.filter-unclassified-btn:hover { border-color: #f7932a; color: #f7932a; }
+.filter-unclassified-btn.active { background: #fff8f0; border-color: #f7932a; color: #f7932a; font-weight: 600; }
+
 /* Category chips (in settings modal) */
 .cat-chips {
   display: flex;
@@ -403,7 +449,7 @@
 .cat-chip {
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 4px;
   background: #eef1ff;
   border: 1.5px solid #c5ccf5;
   border-radius: 20px;
@@ -413,17 +459,37 @@
   font-weight: 600;
 }
 
-.cat-chip-remove {
+.cat-chip-editing {
+  background: #fff;
+  border-color: #4361ee;
+  padding: 4px 8px 4px 12px;
+}
+
+.cat-edit-input {
+  width: 110px;
+  border: none;
+  outline: none;
+  background: transparent;
+  font-family: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #1a1a2e;
+  direction: rtl;
+}
+
+.cat-chip-edit, .cat-chip-confirm, .cat-chip-remove {
   background: none;
   border: none;
   cursor: pointer;
-  font-size: 1rem;
+  font-size: 0.85rem;
   color: #888;
-  padding: 0;
+  padding: 0 2px;
   line-height: 1;
   transition: color 0.15s;
 }
 
+.cat-chip-edit:hover { color: #4361ee; }
+.cat-chip-confirm:hover { color: #1a7a4a; }
 .cat-chip-remove:hover { color: #c0392b; }
 
 /* Badge for unclassified in header */

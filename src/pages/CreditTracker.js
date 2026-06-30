@@ -241,6 +241,8 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
   const [categories, setCategories] = useState(initialCategories);
   const [branchMap, setBranchMap] = useState({ ...initialBranchMap });
   const [newCatName, setNewCatName] = useState('');
+  const [editingCat, setEditingCat] = useState(null); // { original, value }
+  const [renames, setRenames] = useState({});          // { oldName: newName }
 
   const addCategory = () => {
     const name = newCatName.trim();
@@ -256,6 +258,31 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
       Object.keys(next).forEach(k => { if (next[k] === cat) delete next[k]; });
       return next;
     });
+  };
+
+  const startEdit = cat => setEditingCat({ original: cat, value: cat });
+
+  const confirmEdit = () => {
+    if (!editingCat) return;
+    const newName = editingCat.value.trim();
+    if (!newName || (newName !== editingCat.original && categories.includes(newName))) {
+      setEditingCat(null); return;
+    }
+    if (newName === editingCat.original) { setEditingCat(null); return; }
+    const old = editingCat.original;
+    setCategories(prev => prev.map(c => c === old ? newName : c));
+    setBranchMap(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (next[k] === old) next[k] = newName; });
+      return next;
+    });
+    setRenames(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (next[k] === old) next[k] = newName; });
+      next[old] = newName;
+      return next;
+    });
+    setEditingCat(null);
   };
 
   const setMapping = (branch, cat) => {
@@ -275,10 +302,25 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
           <div className="col-map-title" style={{ marginBottom: 10 }}>הקטגוריות שלי</div>
           <div className="cat-chips">
             {categories.map(cat => (
-              <span key={cat} className="cat-chip">
-                {cat}
-                <button className="cat-chip-remove" onClick={() => removeCategory(cat)}>×</button>
-              </span>
+              editingCat && editingCat.original === cat ? (
+                <span key={cat} className="cat-chip cat-chip-editing">
+                  <input
+                    className="cat-edit-input"
+                    value={editingCat.value}
+                    autoFocus
+                    onChange={e => setEditingCat(p => ({ ...p, value: e.target.value }))}
+                    onKeyDown={e => { if (e.key === 'Enter') confirmEdit(); if (e.key === 'Escape') setEditingCat(null); }}
+                  />
+                  <button className="cat-chip-confirm" onClick={confirmEdit} title="אשר">✓</button>
+                  <button className="cat-chip-remove" onClick={() => setEditingCat(null)} title="בטל">✕</button>
+                </span>
+              ) : (
+                <span key={cat} className="cat-chip">
+                  {cat}
+                  <button className="cat-chip-edit" onClick={() => startEdit(cat)} title="שנה שם">✏️</button>
+                  <button className="cat-chip-remove" onClick={() => removeCategory(cat)} title="מחק">×</button>
+                </span>
+              )
             ))}
           </div>
           <div style={{ display: 'flex', gap: 8, marginTop: 10 }}>
@@ -331,7 +373,7 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
-            <button className="btn btn-primary" onClick={() => onSave({ newCategories: categories, newBranchMap: branchMap })}>
+            <button className="btn btn-primary" onClick={() => onSave({ newCategories: categories, newBranchMap: branchMap, renames })}>
               שמור ויישם
             </button>
           </div>
@@ -343,6 +385,7 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
 
 // ── Import modal ───────────────────────────────────────────────────────────────
 function ImportModal({ onImport, onClose, branchMap, categories }) {
+  const [sourceType, setSourceType] = useState('credit'); // 'credit' | 'bank'
   const [cardName, setCardName] = useState('');
   const [file, setFile] = useState(null);
   const [rawData, setRawData] = useState(null);   // { headers, previewRows, allRows, headerIdx, detectedCols }
@@ -396,7 +439,8 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
 
   const handleConfirm = () => {
     if (!parsed) return;
-    const tagged = parsed.map(t => ({ ...t, cardName: cardName || 'כרטיס אשראי' }));
+    const defaultName = sourceType === 'bank' ? 'חשבון בנק' : 'כרטיס אשראי';
+    const tagged = parsed.map(t => ({ ...t, cardName: cardName || defaultName, sourceType }));
     onImport(tagged);
   };
 
@@ -417,18 +461,30 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
   );
 
   return (
-    <Modal title="ייבוא פעולות אשראי" onClose={onClose}>
+    <Modal title="ייבוא פעולות" onClose={onClose}>
       <div className="credit-import">
 
-        {/* Always-visible: card name + file picker */}
+        {/* Source type toggle */}
+        <div className="source-type-toggle">
+          <button
+            className={`source-type-btn ${sourceType === 'credit' ? 'active' : ''}`}
+            onClick={() => setSourceType('credit')}
+          >💳 כרטיס אשראי</button>
+          <button
+            className={`source-type-btn ${sourceType === 'bank' ? 'active' : ''}`}
+            onClick={() => setSourceType('bank')}
+          >🏦 חשבון בנק</button>
+        </div>
+
+        {/* Always-visible: source name + file picker */}
         <div className="credit-import-top">
           <div className="credit-import-field">
-            <label>שם הכרטיס</label>
+            <label>{sourceType === 'bank' ? 'שם החשבון' : 'שם הכרטיס'}</label>
             <input
               className="credit-card-name-input"
               value={cardName}
               onChange={e => setCardName(e.target.value)}
-              placeholder="ויזה הפועלים, כאל, מסטרקארד..."
+              placeholder={sourceType === 'bank' ? 'מזרחי עו"ש, הפועלים...' : 'ויזה הפועלים, כאל, מסטרקארד...'}
             />
           </div>
           <div className="credit-import-field">
@@ -596,6 +652,8 @@ export default function CreditTracker() {
   const [filterCategory, setFilterCategory] = useState('');
   const [filterMonth, setFilterMonth] = useState('');
   const [filterCard, setFilterCard] = useState('');
+  const [filterSource, setFilterSource] = useState('');        // '' | 'credit' | 'bank'
+  const [filterUnclassified, setFilterUnclassified] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
   const handleImport = txns => {
@@ -623,12 +681,15 @@ export default function CreditTracker() {
     if (txn) dispatch({ type: 'UPDATE_CREDIT_TRANSACTION', payload: { ...txn, category, manual: true } });
   };
 
-  const handleSaveSettings = ({ newCategories, newBranchMap }) => {
+  const handleSaveSettings = ({ newCategories, newBranchMap, renames = {} }) => {
     dispatch({ type: 'SET_CREDIT_CATEGORIES', payload: newCategories });
     const reclassified = transactions.map(t => {
       if (t.branch && newBranchMap[t.branch]) return { ...t, category: newBranchMap[t.branch] };
-      const byKeyword = autoClassifyKeyword(t.description);
-      if (byKeyword) return { ...t, category: byKeyword };
+      if (t.category && renames[t.category]) return { ...t, category: renames[t.category] };
+      if (!t.category) {
+        const kw = autoClassifyKeyword(t.description);
+        if (kw) return { ...t, category: kw };
+      }
       return t;
     });
     dispatch({ type: 'APPLY_CREDIT_BRANCH_MAP', payload: { branchMap: newBranchMap, transactions: reclassified } });
@@ -647,11 +708,13 @@ export default function CreditTracker() {
 
   const filtered = useMemo(() => {
     return transactions.filter(t =>
-      (!filterCategory || t.category === filterCategory) &&
-      (!filterMonth   || getMonth(t.billingDate || t.date) === filterMonth) &&
-      (!filterCard    || t.cardName === filterCard)
+      (!filterCategory     || t.category === filterCategory) &&
+      (!filterMonth        || getMonth(t.billingDate || t.date) === filterMonth) &&
+      (!filterCard         || t.cardName === filterCard) &&
+      (!filterSource       || (t.sourceType || 'credit') === filterSource) &&
+      (!filterUnclassified || !t.category)
     );
-  }, [transactions, filterCategory, filterMonth, filterCard]);
+  }, [transactions, filterCategory, filterMonth, filterCard, filterSource, filterUnclassified]);
 
   const sortedFiltered = useMemo(
     () => [...filtered].sort((a, b) => (b.date || '').localeCompare(a.date || '')),
@@ -881,16 +944,27 @@ export default function CreditTracker() {
           <div className="filter-bar">
             {allCards.length > 1 && (
               <select className="filter-select" value={filterCard} onChange={e => setFilterCard(e.target.value)}>
-                <option value="">כל הכרטיסים</option>
+                <option value="">כל הכרטיסים/חשבונות</option>
                 {allCards.map(c => <option key={c} value={c}>{c}</option>)}
               </select>
             )}
+            <select className="filter-select" value={filterSource} onChange={e => setFilterSource(e.target.value)}>
+              <option value="">כל המקורות</option>
+              <option value="credit">💳 כרטיס אשראי</option>
+              <option value="bank">🏦 חשבון בנק</option>
+            </select>
             <select className="filter-select" value={filterCategory} onChange={e => setFilterCategory(e.target.value)}>
               <option value="">כל הקטגוריות</option>
               {categories.map(c => <option key={c} value={c}>{c}</option>)}
             </select>
-            {(filterMonth || filterCard || filterCategory) && (
-              <button className="filter-clear" onClick={() => { setFilterMonth(''); setFilterCard(''); setFilterCategory(''); }}>
+            <button
+              className={`filter-unclassified-btn ${filterUnclassified ? 'active' : ''}`}
+              onClick={() => setFilterUnclassified(p => !p)}
+            >
+              ⚠️ לא מסווגים בלבד
+            </button>
+            {(filterMonth || filterCard || filterSource || filterCategory || filterUnclassified) && (
+              <button className="filter-clear" onClick={() => { setFilterMonth(''); setFilterCard(''); setFilterSource(''); setFilterCategory(''); setFilterUnclassified(false); }}>
                 ✕ נקה הכל
               </button>
             )}
@@ -958,7 +1032,7 @@ export default function CreditTracker() {
                       <td onClick={e => e.stopPropagation()}>
                         <CategorySelect value={t.category} onChange={cat => handleCategoryChange(t.id, cat)} categories={categories} />
                       </td>
-                      <td>{t.cardName || '—'}</td>
+                      <td>{t.sourceType === 'bank' ? '🏦' : '💳'} {t.cardName || '—'}</td>
                       <td className="actions-cell" onClick={e => e.stopPropagation()}>
                         <button className="icon-btn" onClick={() => handleDelete(t.id)}>🗑️</button>
                       </td>
