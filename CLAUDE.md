@@ -110,6 +110,16 @@ Israeli benchmark thresholds used:
 - **CreditTracker: month tabs** — pill-style tabs by billing month replace the month filter dropdown; all grouping (bar chart, pie, filter) now uses `billingDate` with `date` as fallback
 - **CreditTracker: autoClassify** — split into `autoClassifyKeyword` (keyword-only) + `autoClassify(description, branch, branchMap)` (branch map takes priority); `parseWithCols` now accepts `branchMap` so imported transactions are classified immediately
 
+### 2026-06-30 (session 6)
+- **CreditTracker: date format toggle** — `parseIsraeliDate` now accepts `swapDayMonth` param; ImportModal adds "MM/DD/YYYY (אמריקאי)" checkbox in column mapping step (fixes Mizrahi bank date reversal); preview table also reflects the toggle
+- **CreditTracker: KPI "הוצאה חודשית"** — replaced "סה"כ חיובים" with current/selected month total (`currentMonthTotal` useMemo); subtitle shows month name
+- **CreditTracker: pie avg when all months** — `categoryPieData` divides by `allMonths.length` when no month filter; pie title shows "ממוצע חודשי לפי קטגוריה"; legend total shows "ממוצע חודשי"
+- **Multi-category filter** — checkbox dropdown for selecting multiple categories to see combined totals
+- **Bank Excel import** — multi-sheet detection; חובה column auto-detection; income rows auto-filtered
+- **Category rename** — inline ✏️ edit per chip in settings modal; renames applied to existing transactions on save
+- **Month tabs** — pill-style tabs by billing month replacing month filter dropdown
+- **Unclassified filter** — toggle button to show only uncategorized transactions
+
 ### 2026-06-25 (session 2)
 - **CreditTracker: Diners/Mastercard Excel fix** — `detectColumns` now strips `\r\n` from header cells (Mizrahi bank exports use multi-line cell headers); `loadRawFile` extracts global billing date from pre-header row `"עסקאות לחיוב ב-DD/MM/YYYY"`; `parseWithCols` accepts `globalBillingDate` fallback; UI shows green notice when billing date auto-detected; preview table renders Excel serial numbers as real dates
 - **CLAUDE.md** — created this file (session 1)
