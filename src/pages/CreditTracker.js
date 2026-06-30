@@ -187,7 +187,21 @@ function loadRawFile(file) {
           if (m) { globalBillingDate = parseIsraeliDate(m[1]) || ''; break; }
         }
 
-        resolve({ headers, previewRows, allRows, headerIdx, detectedCols, globalBillingDate });
+        // Auto-detect date format: if most sample dates parse as future (> today), file uses MM/DD
+        const today = new Date().toISOString().slice(0, 7);
+        let futureDateCount = 0, sampleCount = 0;
+        if (detectedCols && detectedCols.dateCol >= 0) {
+          for (let i = headerIdx + 1; i < Math.min(headerIdx + 11, allRows.length); i++) {
+            const parsed = parseIsraeliDate(allRows[i][detectedCols.dateCol], false);
+            if (parsed && /^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
+              sampleCount++;
+              if (parsed.slice(0, 7) > today) futureDateCount++;
+            }
+          }
+        }
+        const detectedSwap = sampleCount >= 3 && futureDateCount > sampleCount / 2;
+
+        resolve({ headers, previewRows, allRows, headerIdx, detectedCols, globalBillingDate, detectedSwap });
       } catch (err) {
         reject(err);
       }
@@ -477,6 +491,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
       const raw = await loadRawFile(f);
       setRawData(raw);
       setCols(raw.detectedCols);
+      setSwapDayMonth(raw.detectedSwap || false);
       setStep('map');
     } catch (err) {
       setError(err.message || 'שגיאה בקריאת הקובץ');
@@ -588,7 +603,10 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                 <span className="col-map-label">פורמט תאריך</span>
                 <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
                   <input type="checkbox" checked={swapDayMonth} onChange={e => setSwapDayMonth(e.target.checked)} />
-                  MM/DD/YYYY (אמריקאי — כגון מזרחי בנק)
+                  MM/DD/YYYY (אמריקאי)
+                  {rawData && rawData.detectedSwap && (
+                    <span style={{ color: '#1a7a4a', fontWeight: 600, fontSize: '0.78rem' }}> — זוהה אוטומטית</span>
+                  )}
                 </label>
               </div>
               {rawData.globalBillingDate
