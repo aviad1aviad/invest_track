@@ -78,7 +78,7 @@ function autoClassify(description, branch, branchMap) {
 }
 
 // ── Excel parsing ──────────────────────────────────────────────────────────────
-function parseIsraeliDate(val) {
+function parseIsraeliDate(val, swapDayMonth = false) {
   if (!val) return null;
   if (typeof val === 'number') {
     const d = new Date(Math.round((val - 25569) * 86400 * 1000));
@@ -87,7 +87,8 @@ function parseIsraeliDate(val) {
   const str = String(val).trim();
   const match = str.match(/^(\d{1,2})[-/.](\d{1,2})[-/.](\d{2,4})$/);
   if (match) {
-    const [, d, m, y] = match;
+    const [, a, b, y] = match;
+    const [d, m] = swapDayMonth ? [b, a] : [a, b];
     const year = y.length === 2 ? '20' + y : y;
     return `${year}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
   }
@@ -183,7 +184,7 @@ function loadRawFile(file) {
   });
 }
 
-function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}) {
+function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}, swapDayMonth = false) {
   const rows = allRows.slice(headerIdx + 1);
   return rows
     .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
@@ -193,10 +194,10 @@ function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchM
       const description = String(r[cols.descCol]).trim();
       if (!description) return null;
       const branch = cols.branchCol >= 0 ? String(r[cols.branchCol] || '').trim() : '';
-      const txDate = parseIsraeliDate(r[cols.dateCol]) || '';
+      const txDate = parseIsraeliDate(r[cols.dateCol], swapDayMonth) || '';
       // Use per-row billing date column if mapped, otherwise fall back to global billing date from file header
       const billingDate = cols.billingDateCol >= 0
-        ? (parseIsraeliDate(r[cols.billingDateCol]) || globalBillingDate)
+        ? (parseIsraeliDate(r[cols.billingDateCol], swapDayMonth) || globalBillingDate)
         : globalBillingDate;
       return {
         id: Date.now() + i + Math.random(),
@@ -451,6 +452,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('classified');
   const [step, setStep] = useState('file');        // 'file' | 'map' | 'review'
+  const [swapDayMonth, setSwapDayMonth] = useState(false);
   const fileRef = useRef();
 
   const handleFile = async e => {
@@ -477,7 +479,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
     }
     setError('');
     try {
-      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {});
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {}, swapDayMonth);
       if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
       setParsed(txns);
       setStep('review');
@@ -569,6 +571,13 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                   : <span className="col-map-warn"> ← יש לבחור ידנית</span>}
               </div>
               <ColSelect label="תאריך עסקה" field="dateCol" />
+              <div className="col-map-row">
+                <span className="col-map-label">פורמט תאריך</span>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={swapDayMonth} onChange={e => setSwapDayMonth(e.target.checked)} />
+                  MM/DD/YYYY (אמריקאי — כגון מזרחי בנק)
+                </label>
+              </div>
               {rawData.globalBillingDate
                 ? <div style={{ fontSize: '0.85rem', color: '#1a7a4a', fontWeight: 600, padding: '4px 0' }}>
                     📅 תאריך חיוב זוהה: {rawData.globalBillingDate} (יוחל על כל העסקאות)
@@ -608,8 +617,8 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                             h.idx === cols.descCol ? 'col-hl-desc' :
                             h.idx === cols.amountCol ? 'col-hl-amount' : 'col-dim'
                           }>
-                            {(h.idx === cols.dateCol || h.idx === cols.billingDateCol) && typeof row[h.idx] === 'number'
-                              ? (parseIsraeliDate(row[h.idx]) || String(row[h.idx] ?? ''))
+                            {(h.idx === cols.dateCol || h.idx === cols.billingDateCol)
+                              ? (parseIsraeliDate(row[h.idx], swapDayMonth) || String(row[h.idx] ?? ''))
                               : String(row[h.idx] ?? '')}
                           </td>
                         ))}
@@ -811,6 +820,15 @@ export default function CreditTracker() {
     return Object.values(map).sort((a, b) => a.month.localeCompare(b.month));
   }, [transactions]);
 
+  // Current / latest month total (ignores category filter, reflects card/source filter)
+  const currentMonthTotal = useMemo(() => {
+    const m = filterMonth || (allMonths.length > 0 ? allMonths[0] : '');
+    if (!m) return 0;
+    return transactions
+      .filter(t => getMonth(t.billingDate || t.date) === m)
+      .reduce((s, t) => s + t.amount, 0);
+  }, [transactions, filterMonth, allMonths]);
+
   // All unique non-empty branch values (for settings modal)
   const knownBranches = useMemo(() => {
     return [...new Set(transactions.map(t => t.branch).filter(Boolean))].sort();
@@ -831,11 +849,12 @@ export default function CreditTracker() {
     relevantForPie.forEach(t => {
       map[t.category] = (map[t.category] || 0) + t.amount;
     });
+    const divisor = (!filterMonth && allMonths.length > 1) ? allMonths.length : 1;
     return Object.entries(map)
-      .map(([name, value]) => ({ name, value, color: getCategoryColor(name, categories) }))
+      .map(([name, value]) => ({ name, value: Math.round(value / divisor), color: getCategoryColor(name, categories) }))
       .filter(d => d.value > 0)
       .sort((a, b) => b.value - a.value);
-  }, [relevantForPie, categories]);
+  }, [relevantForPie, categories, filterMonth, allMonths]);
 
   const pieTotal = categoryPieData.reduce((s, d) => s + d.value, 0);
 
@@ -869,9 +888,9 @@ export default function CreditTracker() {
           {/* KPI row */}
           <div className="credit-kpi-row">
             <div className="credit-kpi-card">
-              <div className="credit-kpi-label">סה"כ חיובים</div>
-              <div className="credit-kpi-value">₪{fmt(transactions.reduce((s, t) => s + t.amount, 0))}</div>
-              <div className="credit-kpi-sub">{transactions.length} פעולות</div>
+              <div className="credit-kpi-label">הוצאה חודשית</div>
+              <div className="credit-kpi-value">₪{fmt(currentMonthTotal)}</div>
+              <div className="credit-kpi-sub">{fmtMonth(filterMonth || allMonths[0]) || '—'}</div>
             </div>
             {allMonths.length > 0 && (
               <div className="credit-kpi-card">
@@ -952,7 +971,7 @@ export default function CreditTracker() {
           {categoryPieData.length > 0 && (
             <div className="card credit-chart-card">
               <div className="credit-chart-title">
-                פיזור לפי קטגוריה
+                {!filterMonth && allMonths.length > 1 ? 'ממוצע חודשי לפי קטגוריה' : 'פיזור לפי קטגוריה'}
                 {filterCategories.length > 0 && (
                   <span style={{ marginRight: 8, fontSize: '0.82rem', color: '#4361ee' }}>
                     · {filterCategories.length === 1 ? filterCategories[0] : `${filterCategories.length} קטגוריות · ₪${fmt(totalAmount)}`}
@@ -995,7 +1014,7 @@ export default function CreditTracker() {
                       <span className="legend-amount">₪{fmt(entry.value)}</span>
                     </div>
                   ))}
-                  <div className="legend-total"><span>סה"כ</span><span>₪{fmt(pieTotal)}</span></div>
+                  <div className="legend-total"><span>{!filterMonth && allMonths.length > 1 ? 'ממוצע חודשי' : 'סה"כ'}</span><span>₪{fmt(pieTotal)}</span></div>
                 </div>
               </div>
             </div>
