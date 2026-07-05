@@ -110,6 +110,9 @@ Israeli benchmark thresholds used:
 - **CreditTracker: month tabs** — pill-style tabs by billing month replace the month filter dropdown; all grouping (bar chart, pie, filter) now uses `billingDate` with `date` as fallback
 - **CreditTracker: autoClassify** — split into `autoClassifyKeyword` (keyword-only) + `autoClassify(description, branch, branchMap)` (branch map takes priority); `parseWithCols` now accepts `branchMap` so imported transactions are classified immediately
 
+### 2026-07-05 (session 7)
+- **CreditTracker: bank import — skip future standing orders** — Mizrahi bank exports include `הרשאות קבע` (standing orders) as future-dated rows with numeric serial dates in American `m/d/yy` format (e.g. serial 46301 = October 6, not June 10). `parseWithCols` now accepts `skipFutureDates` flag; bank-source imports filter out rows where `txDate > today`. Date format toggle checkbox removed (root cause fix, no UI changes).
+
 ### 2026-06-30 (session 6)
 - **CreditTracker: date format toggle** — `parseIsraeliDate` now accepts `swapDayMonth` param; ImportModal adds "MM/DD/YYYY (אמריקאי)" checkbox in column mapping step (fixes Mizrahi bank date reversal); preview table also reflects the toggle
 - **CreditTracker: KPI "הוצאה חודשית"** — replaced "סה"כ חיובים" with current/selected month total (`currentMonthTotal` useMemo); subtitle shows month name
