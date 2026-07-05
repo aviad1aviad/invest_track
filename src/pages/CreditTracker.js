@@ -143,13 +143,15 @@ function loadRawFile(file) {
         const wb = XLSX.read(new Uint8Array(e.target.result), { type: 'array' });
         // Try all sheets; pick the one where we can detect a valid header (date+amount)
         let allRows = [];
+        let chosenSheet = null;
         for (const name of wb.SheetNames) {
-          const rows = XLSX.utils.sheet_to_json(wb.Sheets[name], { header: 1, defval: '' });
+          const sheet = wb.Sheets[name];
+          const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, defval: '' });
           const hasHeader = rows.slice(0, 25).some(r => {
             const c = detectColumns(r);
             return c.dateCol >= 0 && c.amountCol >= 0;
           });
-          if (hasHeader || rows.length > allRows.length) allRows = rows;
+          if (hasHeader || rows.length > allRows.length) { allRows = rows; chosenSheet = sheet; }
           if (hasHeader) break;
         }
 
@@ -176,7 +178,6 @@ function loadRawFile(file) {
           label: String(c || `עמודה ${i + 1}`).replace(/[\r\n]+/g, ' ').trim(),
           idx: i,
         }));
-        const previewRows = allRows.slice(headerIdx + 1, headerIdx + 6);
 
         // Extract global billing date from pre-header rows (e.g. "עסקאות לחיוב ב-10/06/2026")
         let globalBillingDate = '';
@@ -187,21 +188,24 @@ function loadRawFile(file) {
           if (m) { globalBillingDate = parseIsraeliDate(m[1]) || ''; break; }
         }
 
-        // Auto-detect date format: if most sample dates parse as future (> today), file uses MM/DD
-        const today = new Date().toISOString().slice(0, 7);
-        let futureDateCount = 0, sampleCount = 0;
-        if (detectedCols && detectedCols.dateCol >= 0) {
-          for (let i = headerIdx + 1; i < Math.min(headerIdx + 11, allRows.length); i++) {
-            const parsed = parseIsraeliDate(allRows[i][detectedCols.dateCol], false);
-            if (parsed && /^\d{4}-\d{2}-\d{2}$/.test(parsed)) {
-              sampleCount++;
-              if (parsed.slice(0, 7) > today) futureDateCount++;
+        // Fix Israeli bank numeric date cells: format code "m/d/yy" in Hebrew locale means D/M/YY.
+        // The bank displays "10/6/26" = June 10, but XLSX interprets the serial as October 6.
+        // Solution: use SSF to get the formatted string, then parseIsraeliDate treats it as DD/MM/YY.
+        if (chosenSheet && detectedCols) {
+          const dateCols = [detectedCols.dateCol, detectedCols.billingDateCol].filter(c => c >= 0);
+          for (let i = headerIdx + 1; i < allRows.length; i++) {
+            for (const col of dateCols) {
+              const cell = chosenSheet[XLSX.utils.encode_cell({ r: i, c: col })];
+              if (cell && cell.t === 'n' && cell.z === 'm/d/yy') {
+                allRows[i][col] = XLSX.SSF.format(cell.z, cell.v);
+              }
             }
           }
         }
-        const detectedSwap = sampleCount >= 3 && futureDateCount > sampleCount / 2;
 
-        resolve({ headers, previewRows, allRows, headerIdx, detectedCols, globalBillingDate, detectedSwap });
+        const previewRows = allRows.slice(headerIdx + 1, headerIdx + 6);
+
+        resolve({ headers, previewRows, allRows, headerIdx, detectedCols, globalBillingDate });
       } catch (err) {
         reject(err);
       }
@@ -210,8 +214,7 @@ function loadRawFile(file) {
   });
 }
 
-function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}, swapDayMonth = false, skipFutureDates = false) {
-  const today = new Date().toISOString().slice(0, 10);
+function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}) {
   const rows = allRows.slice(headerIdx + 1);
   return rows
     .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
@@ -221,12 +224,10 @@ function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchM
       const description = String(r[cols.descCol]).trim();
       if (!description) return null;
       const branch = cols.branchCol >= 0 ? String(r[cols.branchCol] || '').trim() : '';
-      const txDate = parseIsraeliDate(r[cols.dateCol], swapDayMonth) || '';
-      // Bank import: skip future-dated rows (standing orders not yet executed)
-      if (skipFutureDates && txDate && txDate > today) return null;
+      const txDate = parseIsraeliDate(r[cols.dateCol]) || '';
       // Use per-row billing date column if mapped, otherwise fall back to global billing date from file header
       const billingDate = cols.billingDateCol >= 0
-        ? (parseIsraeliDate(r[cols.billingDateCol], swapDayMonth) || globalBillingDate)
+        ? (parseIsraeliDate(r[cols.billingDateCol]) || globalBillingDate)
         : globalBillingDate;
       return {
         id: Date.now() + i + Math.random(),
@@ -482,7 +483,6 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
   const [error, setError] = useState('');
   const [activeTab, setActiveTab] = useState('classified');
   const [step, setStep] = useState('file');        // 'file' | 'map' | 'review'
-  const [swapDayMonth, setSwapDayMonth] = useState(false);
   const fileRef = useRef();
 
   const handleFile = async e => {
@@ -494,7 +494,6 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
       const raw = await loadRawFile(f);
       setRawData(raw);
       setCols(raw.detectedCols);
-      setSwapDayMonth(raw.detectedSwap || false);
       setStep('map');
     } catch (err) {
       setError(err.message || 'שגיאה בקריאת הקובץ');
@@ -510,7 +509,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
     }
     setError('');
     try {
-      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {}, swapDayMonth, sourceType === 'bank');
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {});
       if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
       setParsed(txns);
       setStep('review');
@@ -602,16 +601,6 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                   : <span className="col-map-warn"> ← יש לבחור ידנית</span>}
               </div>
               <ColSelect label="תאריך עסקה" field="dateCol" />
-              <div className="col-map-row">
-                <span className="col-map-label">פורמט תאריך</span>
-                <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: '0.85rem', cursor: 'pointer' }}>
-                  <input type="checkbox" checked={swapDayMonth} onChange={e => setSwapDayMonth(e.target.checked)} />
-                  MM/DD/YYYY (אמריקאי)
-                  {rawData && rawData.detectedSwap && (
-                    <span style={{ color: '#1a7a4a', fontWeight: 600, fontSize: '0.78rem' }}> — זוהה אוטומטית</span>
-                  )}
-                </label>
-              </div>
               {rawData.globalBillingDate
                 ? <div style={{ fontSize: '0.85rem', color: '#1a7a4a', fontWeight: 600, padding: '4px 0' }}>
                     📅 תאריך חיוב זוהה: {rawData.globalBillingDate} (יוחל על כל העסקאות)
@@ -652,7 +641,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
                             h.idx === cols.amountCol ? 'col-hl-amount' : 'col-dim'
                           }>
                             {(h.idx === cols.dateCol || h.idx === cols.billingDateCol)
-                              ? (parseIsraeliDate(row[h.idx], swapDayMonth) || String(row[h.idx] ?? ''))
+                              ? (parseIsraeliDate(row[h.idx]) || String(row[h.idx] ?? ''))
                               : String(row[h.idx] ?? '')}
                           </td>
                         ))}
