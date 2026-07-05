@@ -210,7 +210,8 @@ function loadRawFile(file) {
   });
 }
 
-function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}, swapDayMonth = false) {
+function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}, swapDayMonth = false, skipFutureDates = false) {
+  const today = new Date().toISOString().slice(0, 10);
   const rows = allRows.slice(headerIdx + 1);
   return rows
     .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
@@ -221,6 +222,8 @@ function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchM
       if (!description) return null;
       const branch = cols.branchCol >= 0 ? String(r[cols.branchCol] || '').trim() : '';
       const txDate = parseIsraeliDate(r[cols.dateCol], swapDayMonth) || '';
+      // Bank import: skip future-dated rows (standing orders not yet executed)
+      if (skipFutureDates && txDate && txDate > today) return null;
       // Use per-row billing date column if mapped, otherwise fall back to global billing date from file header
       const billingDate = cols.billingDateCol >= 0
         ? (parseIsraeliDate(r[cols.billingDateCol], swapDayMonth) || globalBillingDate)
@@ -507,7 +510,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
     }
     setError('');
     try {
-      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {}, swapDayMonth);
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {}, swapDayMonth, sourceType === 'bank');
       if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
       setParsed(txns);
       setStep('review');
