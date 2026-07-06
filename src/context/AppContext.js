@@ -184,10 +184,14 @@ export function AppProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
   const [initialized, setInitialized] = useState(false);
+  // Only sync after a successful load — prevents overwriting Firestore with empty state
+  // when the initial read fails (network error + empty localStorage).
+  const [safeToSync, setSafeToSync] = useState(false);
 
   useEffect(() => {
     async function load() {
       let data = null;
+      let firestoreError = false;
       try {
         const snap = await getDoc(DOC_REF);
         if (snap.exists()) {
@@ -197,6 +201,7 @@ export function AppProvider({ children }) {
           if (local) data = JSON.parse(local);
         }
       } catch {
+        firestoreError = true;
         const local = localStorage.getItem('investTrackData');
         if (local) data = JSON.parse(local);
       }
@@ -210,18 +215,20 @@ export function AppProvider({ children }) {
 
       setLoading(false);
       setInitialized(true);
+      // Allow syncing only if Firestore read succeeded, or if there's genuinely no data anywhere
+      if (!firestoreError || data) setSafeToSync(true);
     }
     load();
   }, []);
 
   useEffect(() => {
-    if (!initialized) return;
+    if (!initialized || !safeToSync) return;
     localStorage.setItem('investTrackData', JSON.stringify(state));
     setSyncing(true);
     setDoc(DOC_REF, sanitize(state))
       .catch(() => {})
       .finally(() => setSyncing(false));
-  }, [state, initialized]);
+  }, [state, initialized, safeToSync]);
 
   if (loading) {
     return (
