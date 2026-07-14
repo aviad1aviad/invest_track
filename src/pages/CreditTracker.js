@@ -743,6 +743,15 @@ export default function CreditTracker() {
   const [filterSource, setFilterSource] = useState('');
   const [filterUnclassified, setFilterUnclassified] = useState(false);
   const [selectedIds, setSelectedIds] = useState(new Set());
+  const filterInitialized = useRef(false);
+
+  // Default to most recent month on first load
+  useEffect(() => {
+    if (!filterInitialized.current && allMonths.length > 0) {
+      filterInitialized.current = true;
+      setFilterMonth(allMonths[0]);
+    }
+  }, [allMonths]);
 
   const handleImport = txns => {
     dispatch({ type: 'ADD_CREDIT_TRANSACTIONS', payload: txns });
@@ -924,11 +933,6 @@ export default function CreditTracker() {
                 <div className="credit-kpi-sub">{allMonths.length} חודשים</div>
               </div>
             )}
-            <div className="credit-kpi-card">
-              <div className="credit-kpi-label">כרטיסים</div>
-              <div className="credit-kpi-value">{allCards.length || '—'}</div>
-              <div className="credit-kpi-sub">{allCards.join(', ') || 'לא צוין'}</div>
-            </div>
             {unclassifiedCount > 0 && (
               <div className="credit-kpi-card warn">
                 <div className="credit-kpi-label">לסיווג</div>
@@ -937,27 +941,6 @@ export default function CreditTracker() {
               </div>
             )}
           </div>
-
-          {/* Month tabs */}
-          {allMonths.length > 0 && (
-            <div className="credit-month-tabs">
-              <button
-                className={`credit-month-tab ${filterMonth === '' ? 'active' : ''}`}
-                onClick={() => setFilterMonth('')}
-              >
-                כל החודשים
-              </button>
-              {allMonths.map(m => (
-                <button
-                  key={m}
-                  className={`credit-month-tab ${filterMonth === m ? 'active' : ''}`}
-                  onClick={() => setFilterMonth(m)}
-                >
-                  {fmtMonth(m)}
-                </button>
-              ))}
-            </div>
-          )}
 
           {/* Monthly bar chart */}
           {monthlyData.length > 1 && (
@@ -981,12 +964,27 @@ export default function CreditTracker() {
                   />
                 </BarChart>
               </ResponsiveContainer>
-              {filterMonth && (
-                <div className="credit-active-filter">
-                  מציג: {fmtMonth(filterMonth)}
-                  <button onClick={() => setFilterMonth('')} className="filter-clear">✕ נקה</button>
-                </div>
-              )}
+            </div>
+          )}
+
+          {/* Month tabs */}
+          {allMonths.length > 0 && (
+            <div className="credit-month-tabs">
+              <button
+                className={`credit-month-tab ${filterMonth === '' ? 'active' : ''}`}
+                onClick={() => setFilterMonth('')}
+              >
+                כל החודשים
+              </button>
+              {allMonths.map(m => (
+                <button
+                  key={m}
+                  className={`credit-month-tab ${filterMonth === m ? 'active' : ''}`}
+                  onClick={() => setFilterMonth(m)}
+                >
+                  {fmtMonth(m)}
+                </button>
+              ))}
             </div>
           )}
 

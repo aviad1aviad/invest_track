@@ -63,6 +63,17 @@ export default function Dashboard() {
 
   const totalExpenses = state.expenses.reduce((s, e) => s + (Number(e.amount) || 0), 0);
   const totalIncomes = (state.incomes || []).reduce((s, i) => s + (Number(i.amount) || 0), 0);
+
+  const avgCreditMonthly = (() => {
+    const txns = state.creditTransactions || [];
+    if (txns.length === 0) return 0;
+    const months = new Set(txns.map(t => {
+      const d = t.billingDate || t.date || '';
+      return d.slice(0, 7);
+    }).filter(Boolean));
+    const total = txns.reduce((s, t) => s + (Number(t.amount) || 0), 0);
+    return months.size > 0 ? total / months.size : 0;
+  })();
   const balance = totalIncomes - totalExpenses;
   const totalSavings = state.savings.reduce((s, sv) => s + (Number(sv.currentAmount) || 0), 0);
   const totalInvCurrentValue = state.investments.reduce((s, inv) => s + calcInvCurrentValue(inv), 0);
@@ -131,6 +142,13 @@ export default function Dashboard() {
           <div className="kpi-value expenses">₪{fmt(totalExpenses)}</div>
           <div className="kpi-sub">{state.expenses.length} הוצאות קבועות</div>
         </div>
+        {avgCreditMonthly > 0 && (
+          <div className="kpi-card">
+            <div className="kpi-label">ממוצע כרטיסים</div>
+            <div className="kpi-value expenses">₪{fmt(avgCreditMonthly)}</div>
+            <div className="kpi-sub">ממוצע חודשי בפועל</div>
+          </div>
+        )}
         <div className="kpi-card kpi-balance">
           <div className="kpi-label">מאזן חודשי</div>
           <div className={`kpi-value ${balance >= 0 ? 'profit' : 'loss'}`}>
