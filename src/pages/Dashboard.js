@@ -97,6 +97,22 @@ export default function Dashboard() {
     .map(([name, value]) => ({ name, value, color: getColor(name) }))
     .sort((a, b) => b.value - a.value);
 
+  const creditCategoryPie = (() => {
+    const txns = state.creditTransactions || [];
+    if (txns.length === 0) return [];
+    const months = new Set(txns.map(t => (t.billingDate || t.date || '').slice(0, 7)).filter(Boolean));
+    const divisor = months.size || 1;
+    const map = {};
+    txns.forEach(t => {
+      const cat = t.category || 'לא מסווג';
+      map[cat] = (map[cat] || 0) + (Number(t.amount) || 0);
+    });
+    return Object.entries(map)
+      .map(([name, value]) => ({ name, value: Math.round(value / divisor), color: getColor(name) }))
+      .filter(d => d.value > 0)
+      .sort((a, b) => b.value - a.value);
+  })();
+
   return (
     <div className="page">
       <div className="page-header">
@@ -194,6 +210,25 @@ export default function Dashboard() {
               </PieChart>
             </ResponsiveContainer>
             <PieLegend data={globalPieData} total={grandTotal} />
+          </div>
+        </div>
+      )}
+
+      {/* Credit expenses by category — average monthly */}
+      {creditCategoryPie.length > 0 && (
+        <div className="card dash-section">
+          <SectionTitle>ממוצע הוצאות חודשיות לפי קטגוריה</SectionTitle>
+          <div className="dash-chart-layout">
+            <ResponsiveContainer width={260} height={260}>
+              <PieChart>
+                <Pie data={creditCategoryPie} dataKey="value" nameKey="name" cx="50%" cy="50%"
+                  innerRadius={55} outerRadius={110}>
+                  {creditCategoryPie.map((entry, i) => <Cell key={i} fill={entry.color} />)}
+                </Pie>
+                <Tooltip formatter={v => `₪${fmt(v)}`} />
+              </PieChart>
+            </ResponsiveContainer>
+            <PieLegend data={creditCategoryPie} total={creditCategoryPie.reduce((s, d) => s + d.value, 0)} />
           </div>
         </div>
       )}

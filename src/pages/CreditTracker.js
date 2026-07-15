@@ -402,8 +402,8 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
   };
 
   return (
-    <Modal title="ניהול קטגוריות" onClose={onClose}>
-      <div className="credit-import" style={{ minWidth: 400 }}>
+    <Modal title="ניהול קטגוריות" onClose={onClose} width={700}>
+      <div className="credit-import">
 
         {/* Categories list */}
         <div>
