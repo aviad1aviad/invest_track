@@ -836,14 +836,6 @@ export default function CreditTracker() {
   const [selectedIds, setSelectedIds] = useState(new Set());
   const filterInitialized = useRef(false);
 
-  // Default to most recent month on first load
-  useEffect(() => {
-    if (!filterInitialized.current && allMonths.length > 0) {
-      filterInitialized.current = true;
-      setFilterMonth(allMonths[0]);
-    }
-  }, [allMonths]);
-
   const handleImport = txns => {
     dispatch({ type: 'ADD_CREDIT_TRANSACTIONS', payload: txns });
     setShowImport(false);
@@ -895,6 +887,14 @@ export default function CreditTracker() {
     const months = [...new Set(transactions.map(t => getMonth(t.billingDate || t.date)).filter(Boolean))].sort().reverse();
     return months;
   }, [transactions]);
+
+  // Default to most recent month on first load
+  useEffect(() => {
+    if (!filterInitialized.current && allMonths.length > 0) {
+      filterInitialized.current = true;
+      setFilterMonth(allMonths[0]);
+    }
+  }, [allMonths]);
 
   const allCards = useMemo(() => {
     return [...new Set(transactions.map(t => t.cardName).filter(Boolean))].sort();
