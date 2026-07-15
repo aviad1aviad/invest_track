@@ -11,8 +11,9 @@ const INITIAL_STATE = {
   incomes: [],
   snapshots: [],
   creditTransactions: [],
-  creditCategories: [],   // [] = use defaults in CreditTracker
-  creditBranchMap: {},    // { branchValue: categoryName }
+  creditCategories: [],      // [] = use defaults in CreditTracker
+  creditBranchMap: {},       // { branchValue: categoryName }
+  creditDescriptionMap: {},  // { exactDescription: categoryName }
 };
 
 const DOC_REF = doc(db, 'userData', 'main');
@@ -173,6 +174,14 @@ function reducer(state, action) {
       return { ...state, creditCategories: action.payload };
     case 'APPLY_CREDIT_BRANCH_MAP':
       return { ...state, creditBranchMap: action.payload.branchMap, creditTransactions: action.payload.transactions };
+    case 'APPLY_CREDIT_SETTINGS':
+      return {
+        ...state,
+        creditCategories: action.payload.categories,
+        creditBranchMap: action.payload.branchMap,
+        creditDescriptionMap: action.payload.descriptionMap,
+        creditTransactions: action.payload.transactions,
+      };
 
     default:
       return state;

@@ -71,8 +71,9 @@ function autoClassifyKeyword(description) {
   return null;
 }
 
-// Full classify: branch map takes priority, then keywords
-function autoClassify(description, branch, branchMap) {
+// Full classify: descriptionMap → branchMap → keywords
+function autoClassify(description, branch, branchMap, descriptionMap) {
+  if (description && descriptionMap && descriptionMap[description]) return descriptionMap[description];
   if (branch && branchMap && branchMap[branch]) return branchMap[branch];
   return autoClassifyKeyword(description);
 }
@@ -214,7 +215,7 @@ function loadRawFile(file) {
   });
 }
 
-function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}) {
+function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchMap = {}, descriptionMap = {}) {
   const rows = allRows.slice(headerIdx + 1);
   return rows
     .filter(r => r[cols.descCol] !== '' && r[cols.descCol] !== undefined && r[cols.amountCol] !== '')
@@ -236,7 +237,7 @@ function parseWithCols(allRows, headerIdx, cols, globalBillingDate = '', branchM
         description,
         amount,
         branch,
-        category: autoClassify(description, branch, branchMap),
+        category: autoClassify(description, branch, branchMap, descriptionMap),
         manual: false,
       };
     })
@@ -325,9 +326,10 @@ function MultiCategoryFilter({ categories, selected, onChange }) {
 }
 
 // ── Category Settings modal ────────────────────────────────────────────────────
-function CategorySettingsModal({ onClose, onSave, initialCategories, initialBranchMap, knownBranches }) {
+function CategorySettingsModal({ onClose, onSave, initialCategories, initialBranchMap, initialDescriptionMap, knownBranches, branchSuggestions, descriptionSuggestions }) {
   const [categories, setCategories] = useState(initialCategories);
   const [branchMap, setBranchMap] = useState({ ...initialBranchMap });
+  const [descriptionMap, setDescriptionMap] = useState({ ...initialDescriptionMap });
   const [newCatName, setNewCatName] = useState('');
   const [editingCat, setEditingCat] = useState(null); // { original, value }
   const [renames, setRenames] = useState({});          // { oldName: newName }
@@ -346,6 +348,19 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
       Object.keys(next).forEach(k => { if (next[k] === cat) delete next[k]; });
       return next;
     });
+    setDescriptionMap(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (next[k] === cat) delete next[k]; });
+      return next;
+    });
+  };
+
+  const setDescMapping = (desc, cat) => {
+    setDescriptionMap(prev => {
+      const next = { ...prev };
+      if (!cat) delete next[desc]; else next[desc] = cat;
+      return next;
+    });
   };
 
   const startEdit = cat => setEditingCat({ original: cat, value: cat });
@@ -360,6 +375,11 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
     const old = editingCat.original;
     setCategories(prev => prev.map(c => c === old ? newName : c));
     setBranchMap(prev => {
+      const next = { ...prev };
+      Object.keys(next).forEach(k => { if (next[k] === old) next[k] = newName; });
+      return next;
+    });
+    setDescriptionMap(prev => {
       const next = { ...prev };
       Object.keys(next).forEach(k => { if (next[k] === old) next[k] = newName; });
       return next;
@@ -424,6 +444,53 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
           </div>
         </div>
 
+        {/* Suggestions */}
+        {(branchSuggestions.length > 0 || descriptionSuggestions.length > 0) && (
+          <div>
+            <div className="col-map-title" style={{ marginBottom: 10 }}>
+              💡 הצעות לסיווג
+              <span style={{ fontSize: '0.78rem', fontWeight: 400, color: '#888', marginRight: 8 }}>
+                פעולות שחוזרות ועדיין לא ממופות
+              </span>
+            </div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ fontSize: '0.9rem' }}>
+                <thead>
+                  <tr><th>פעולה</th><th>סוג</th><th>כמות</th><th>קטגוריה</th></tr>
+                </thead>
+                <tbody>
+                  {branchSuggestions.map(({ branch, count }) => (
+                    <tr key={'b_' + branch} style={{ background: '#fffbe6' }}>
+                      <td>{branch}</td>
+                      <td style={{ color: '#888', fontSize: '0.8rem' }}>ענף</td>
+                      <td style={{ textAlign: 'center' }}>{count}</td>
+                      <td>
+                        <select className="filter-select" value={branchMap[branch] || ''} onChange={e => setMapping(branch, e.target.value)}>
+                          <option value="">— בחר קטגוריה —</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                  {descriptionSuggestions.map(({ description, count }) => (
+                    <tr key={'d_' + description} style={{ background: '#f0f7ff' }}>
+                      <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{description}</td>
+                      <td style={{ color: '#888', fontSize: '0.8rem' }}>שם עסק</td>
+                      <td style={{ textAlign: 'center' }}>{count}</td>
+                      <td>
+                        <select className="filter-select" value={descriptionMap[description] || ''} onChange={e => setDescMapping(description, e.target.value)}>
+                          <option value="">— בחר קטגוריה —</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
         {/* Branch → category mapping */}
         {knownBranches.length > 0 && (
           <div>
@@ -438,12 +505,35 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
                     <tr key={branch}>
                       <td>{branch}</td>
                       <td>
-                        <select
-                          className="filter-select"
-                          value={branchMap[branch] || ''}
-                          onChange={e => setMapping(branch, e.target.value)}
-                        >
+                        <select className="filter-select" value={branchMap[branch] || ''} onChange={e => setMapping(branch, e.target.value)}>
                           <option value="">— לא מסווג —</option>
+                          {categories.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Description → category mapping */}
+        {Object.keys(descriptionMap).length > 0 && (
+          <div>
+            <div className="col-map-title" style={{ marginBottom: 10 }}>מיפוי שם עסק ← קטגוריה</div>
+            <div style={{ overflowX: 'auto' }}>
+              <table className="data-table" style={{ fontSize: '0.9rem' }}>
+                <thead>
+                  <tr><th>שם עסק</th><th>קטגוריה</th></tr>
+                </thead>
+                <tbody>
+                  {Object.entries(descriptionMap).map(([desc, cat]) => (
+                    <tr key={desc}>
+                      <td style={{ maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{desc}</td>
+                      <td>
+                        <select className="filter-select" value={cat} onChange={e => setDescMapping(desc, e.target.value)}>
+                          <option value="">— הסר מיפוי —</option>
                           {categories.map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </td>
@@ -457,11 +547,11 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
 
         <div className="credit-import-footer">
           <span className="credit-import-summary">
-            {Object.keys(branchMap).length} ענפים ממופים מתוך {knownBranches.length}
+            {Object.keys(branchMap).length} ענפים · {Object.keys(descriptionMap).length} עסקים ממופים
           </span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-secondary" onClick={onClose}>ביטול</button>
-            <button className="btn btn-primary" onClick={() => onSave({ newCategories: categories, newBranchMap: branchMap, renames })}>
+            <button className="btn btn-primary" onClick={() => onSave({ newCategories: categories, newBranchMap: branchMap, newDescriptionMap: descriptionMap, renames })}>
               שמור ויישם
             </button>
           </div>
@@ -472,7 +562,7 @@ function CategorySettingsModal({ onClose, onSave, initialCategories, initialBran
 }
 
 // ── Import modal ───────────────────────────────────────────────────────────────
-function ImportModal({ onImport, onClose, branchMap, categories }) {
+function ImportModal({ onImport, onClose, branchMap, descriptionMap, categories }) {
   const [sourceType, setSourceType] = useState('credit'); // 'credit' | 'bank'
   const [cardName, setCardName] = useState('');
   const [file, setFile] = useState(null);
@@ -509,7 +599,7 @@ function ImportModal({ onImport, onClose, branchMap, categories }) {
     }
     setError('');
     try {
-      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {});
+      const txns = parseWithCols(rawData.allRows, rawData.headerIdx, cols, rawData.globalBillingDate || '', branchMap || {}, descriptionMap || {});
       if (txns.length === 0) { setError('לא נמצאו שורות עם נתונים תקינים'); return; }
       setParsed(txns);
       setStep('review');
@@ -734,6 +824,7 @@ export default function CreditTracker() {
     [state.creditCategories]
   );
   const branchMap = useMemo(() => state.creditBranchMap || {}, [state.creditBranchMap]);
+  const descriptionMap = useMemo(() => state.creditDescriptionMap || {}, [state.creditDescriptionMap]);
 
   const [showImport, setShowImport] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
@@ -778,9 +869,10 @@ export default function CreditTracker() {
     if (txn) dispatch({ type: 'UPDATE_CREDIT_TRANSACTION', payload: { ...txn, category, manual: true } });
   };
 
-  const handleSaveSettings = ({ newCategories, newBranchMap, renames = {} }) => {
-    dispatch({ type: 'SET_CREDIT_CATEGORIES', payload: newCategories });
+  const handleSaveSettings = ({ newCategories, newBranchMap, newDescriptionMap, renames = {} }) => {
     const reclassified = transactions.map(t => {
+      const desc = t.description || '';
+      if (newDescriptionMap[desc]) return { ...t, category: newDescriptionMap[desc] };
       if (t.branch && newBranchMap[t.branch]) return { ...t, category: newBranchMap[t.branch] };
       if (t.category && renames[t.category]) return { ...t, category: renames[t.category] };
       if (!t.category) {
@@ -789,7 +881,12 @@ export default function CreditTracker() {
       }
       return t;
     });
-    dispatch({ type: 'APPLY_CREDIT_BRANCH_MAP', payload: { branchMap: newBranchMap, transactions: reclassified } });
+    dispatch({ type: 'APPLY_CREDIT_SETTINGS', payload: {
+      categories: newCategories,
+      branchMap: newBranchMap,
+      descriptionMap: newDescriptionMap,
+      transactions: reclassified,
+    }});
     setShowSettings(false);
   };
 
@@ -865,6 +962,26 @@ export default function CreditTracker() {
   const knownBranches = useMemo(() => {
     return [...new Set(transactions.map(t => t.branch).filter(Boolean))].sort();
   }, [transactions]);
+
+  // Branches appearing 5+ times not yet in branchMap — suggestions
+  const branchSuggestions = useMemo(() => {
+    const counts = {};
+    transactions.forEach(t => { if (t.branch) counts[t.branch] = (counts[t.branch] || 0) + 1; });
+    return Object.entries(counts)
+      .filter(([b, n]) => n >= 5 && !branchMap[b])
+      .sort((a, b) => b[1] - a[1])
+      .map(([branch, count]) => ({ branch, count }));
+  }, [transactions, branchMap]);
+
+  // Descriptions appearing 2+ times not yet in descriptionMap — suggestions
+  const descriptionSuggestions = useMemo(() => {
+    const counts = {};
+    transactions.forEach(t => { if (t.description) counts[t.description] = (counts[t.description] || 0) + 1; });
+    return Object.entries(counts)
+      .filter(([d, n]) => n >= 2 && !descriptionMap[d])
+      .sort((a, b) => b[1] - a[1])
+      .map(([description, count]) => ({ description, count }));
+  }, [transactions, descriptionMap]);
 
   // Category pie data — not filtered by category (shows all categories for month/card)
   const relevantForPie = useMemo(() => {
@@ -1192,6 +1309,7 @@ export default function CreditTracker() {
           onImport={handleImport}
           onClose={() => setShowImport(false)}
           branchMap={branchMap}
+          descriptionMap={descriptionMap}
           categories={categories}
         />
       )}
@@ -1202,7 +1320,10 @@ export default function CreditTracker() {
           onSave={handleSaveSettings}
           initialCategories={categories}
           initialBranchMap={branchMap}
+          initialDescriptionMap={descriptionMap}
           knownBranches={knownBranches}
+          branchSuggestions={branchSuggestions}
+          descriptionSuggestions={descriptionSuggestions}
         />
       )}
     </div>
